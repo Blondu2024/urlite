@@ -130,7 +130,9 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
           /* cross-origin never happens with srcdoc, but be safe */
         }
       }
-      setPreviewHtml(renderSiteHTML(config, { appUrl: location.origin + '/app' }));
+      /* still: the preview renders already settled — a keystroke must never
+         replay the entrance choreography (strobing; see still-preview.test.ts) */
+      setPreviewHtml(renderSiteHTML(config, { appUrl: location.origin + '/app', still: true }));
       try {
         localStorage.setItem(DRAFT_KEY, JSON.stringify(config));
       } catch {

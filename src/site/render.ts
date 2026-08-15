@@ -18,6 +18,13 @@ export interface RenderOptions {
   appUrl?: string;
   /** when true, the credit line is omitted (bare export) */
   noCredit?: boolean;
+  /**
+   * Render the page already settled: no entrance animations, no GSAP.
+   * Used by the editor preview so a keystroke never replays the first-visit
+   * choreography (the "strobing" Anthony reported, 15 Aug 2026). The viewer,
+   * the shared link and the HTML export never set this.
+   */
+  still?: boolean;
 }
 
 const esc = escHtml;
@@ -251,7 +258,7 @@ ${sliders}
     : `<span class="credit">Built with <a href="${esc(appUrl)}" rel="noopener">Urlite</a> — this entire website lives inside its link.</span>`;
 
   return `<!doctype html>
-<html lang="${c.lang}">
+<html lang="${c.lang}"${opts.still ? ' class="still"' : ''}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -317,6 +324,10 @@ h2 em,h1 em{font-style:normal;color:var(--accent)}
   .hstrip .cell:nth-child(3){animation-delay:.54s}
 }
 @keyframes riseIn{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}
+${opts.still ? `/* settled preview: everything sits in its final state, nothing replays */
+html.still .rv-h,html.still .hstrip .cell{animation:none!important}
+html.still .tick-track{animation:none}
+` : ''}
 
 .nav{position:fixed;inset:0 0 auto;z-index:80;transition:background .3s var(--e-out),
   border-color .3s var(--e-out),backdrop-filter .3s;border-bottom:1px solid transparent}
@@ -515,13 +526,13 @@ footer .credit a:hover{color:rgba(255,255,255,.7)}
 </style>
 </head>
 <body>
-<script>
+${opts.still ? '' : `<script>
 (function(){
   if(matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   var r=document.documentElement; r.classList.add('js');
   setTimeout(function(){ if(!window.gsap) r.classList.remove('js'); },2500);
 })();
-</script>
+</script>`}
 
 <header class="nav" id="nav">
   <div class="wrap">
@@ -566,8 +577,8 @@ ${contactSec}
   </div>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>
+${opts.still ? '' : `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>`}
 <script>
 document.querySelectorAll('[data-slider]').forEach(function(el){
   var down=false;
@@ -580,7 +591,7 @@ document.querySelectorAll('[data-slider]').forEach(function(el){
 });
 var nav=document.getElementById('nav');
 addEventListener('scroll',function(){nav.classList.toggle('solid',scrollY>60);},{passive:true});
-addEventListener('load',function(){
+${opts.still ? '' : `addEventListener('load',function(){
   var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
   if(reduce||!window.gsap||!window.ScrollTrigger){
     document.documentElement.classList.remove('js'); return; }
@@ -602,7 +613,7 @@ addEventListener('load',function(){
       gsap.fromTo(el,{'--pos':'88%'},{'--pos':'42%',duration:1.5,ease:'power2.inOut',delay:.25});
     }});
   });
-});
+});`}
 </script>
 </body>
 </html>`;

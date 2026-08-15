@@ -232,7 +232,11 @@ input, textarea, select { font: inherit; color: inherit; }
 .f input:focus, .f textarea:focus { border-color: var(--ink); outline: none; }
 .f textarea { resize: vertical; min-height: 64px; line-height: 1.5; }
 .f .hint { font-size: 0.78rem; color: var(--ink-2); margin-top: 5px; }
-.f-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+/* Paired fields: equal columns no matter how long the content is, and each
+   field bottom-justified so the inputs stay level even when one label wraps
+   to two lines ("Phone (with country code)" vs "Phone, as shown"). */
+.f-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.f-row .f { display: flex; flex-direction: column; justify-content: flex-end; }
 
 /* Toggles live inside `.f`, so every rule here has to match `.f label` (0,1,1)
    or the field-caption styling wins and the switch renders as a text label. */
@@ -250,14 +254,17 @@ input, textarea, select { font: inherit; color: inherit; }
 .f .toggle input:checked + .tk::after { left: 19px; }
 .f .toggle input:focus-visible + .tk { outline: 3px solid var(--accent); outline-offset: 2px; }
 
-/* palette swatches */
-.swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 12px; }
-.sw { border-radius: 10px; overflow: hidden; border: 2px solid transparent; cursor: pointer; transition: transform 0.2s var(--e-out); padding: 0; }
+/* palette swatches — uniform by construction: two equal-width columns
+   (minmax(0,1fr), so no name can widen its column), names never wrap
+   (nowrap+ellipsis is what made "Midnight & Coral" taller than its peers),
+   and the name strip absorbs any leftover height from the stretched row. */
+.swatches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.sw { display: flex; flex-direction: column; border-radius: 10px; overflow: hidden; border: 2px solid transparent; cursor: pointer; transition: transform 0.2s var(--e-out); padding: 0; }
 .sw:hover { transform: translateY(-2px); }
 .sw.on { border-color: var(--ink); }
-.sw .sw-c { height: 34px; display: flex; }
+.sw .sw-c { height: 34px; display: flex; flex: none; }
 .sw .sw-c i { flex: 1; }
-.sw span { display: block; font-size: 0.68rem; padding: 5px 4px 6px; text-align: center; color: var(--ink-2); background: var(--paper); }
+.sw span { display: block; flex-grow: 1; font-size: 0.68rem; padding: 5px 6px 6px; text-align: center; color: var(--ink-2); background: var(--paper); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* icon picker */
 .icons { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 8px; }

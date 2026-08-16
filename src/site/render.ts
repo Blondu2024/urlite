@@ -62,7 +62,7 @@ const GALLERY_PATTERNS: Record<number, string[]> = {
 export function renderSiteHTML(c: SiteConfig, opts: RenderOptions = {}): string {
   const t = c.theme;
   const tel = telHref(c.hero.phone);
-  const appUrl = opts.appUrl ?? 'https://urlite.vercel.app';
+  const appUrl = opts.appUrl ?? 'https://urlite.app';
 
   const hasServices = c.services.items.length > 0;
   const workItems = c.work.items.filter((w) => safeImageUrl(w.before) && safeImageUrl(w.after));

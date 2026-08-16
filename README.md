@@ -1,12 +1,12 @@
 # Urlite — the website that lives inside the link
 
-**Live: [urlite-app.vercel.app](https://urlite-app.vercel.app)**
+**Live: [urlite.app](https://urlite.app)**
 
 Urlite is a one-page website builder with **zero backend**. The entire site — every word,
 colour, section and photo address — is compressed into the URL fragment itself:
 
 ```
-https://urlite-app.vercel.app/s/#v1.<deflate → base64url of the site's JSON>
+https://urlite.app/s/#v1.<deflate → base64url of the site's JSON>
 ```
 
 The fragment never reaches any server. There is no database, no account, no analytics.
@@ -16,7 +16,7 @@ the whole website fits inside a QR code.
 
 ## What you get
 
-- **Live editor** at [`/app`](https://urlite-app.vercel.app/app) — edit on the left,
+- **Live editor** at [`/app`](https://urlite.app/app) — edit on the left,
   WYSIWYG preview on the right. Your draft autosaves into the link in the address bar.
 - **Templates** for real small businesses (garden care, painter, restaurant, salon,
   auto service) plus an **app page** — the one-pager Apple/Google expect for a store

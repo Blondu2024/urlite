@@ -87,6 +87,32 @@ describe('extractSite — heuristics', () => {
   });
 });
 
+describe('extractSite — Facebook pages (the audience that has no website)', () => {
+  const FB = `<!doctype html><html id="facebook"><head>
+    <meta property="og:title" content="Frizeria Figaro">
+    <meta property="og:description" content="Frizeria Figaro. 1.234 likes &#xb7; 12 talking about this. Tunsori clasice și moderne în centrul Clujului, din 2015.">
+    <meta property="og:image" content="https://scontent-otp1-1.xx.fbcdn.net/v/t39/355_n.png?stp=x">
+  </head><body>
+    <img src="https://static.xx.fbcdn.net/rsrc.php/sprite.png">
+  </body></html>`;
+
+  it('takes the page name and cleans the likes boilerplate out of the about text', () => {
+    const { config, found } = extractSite(FB, 'https://www.facebook.com/frizeriafigaro', base());
+    expect(config.brandName).toBe('Frizeria Figaro');
+    expect(config.hero.lede).toBe('Tunsori clasice și moderne în centrul Clujului, din 2015.');
+    expect(config.hero.lede).not.toContain('likes');
+    expect(found).toContain('title');
+  });
+
+  it('uses only the profile photo — never Facebook UI sprites', () => {
+    const b = base();
+    const { config } = extractSite(FB, 'https://www.facebook.com/frizeriafigaro', b);
+    expect(config.hero.image).toContain('scontent');
+    expect(JSON.stringify(config.gallery.images)).not.toContain('sprite');
+    expect(config.gallery.images).toEqual(b.gallery.images);
+  });
+});
+
 describe('nearestPalette', () => {
   it('is exact on an exact brand colour', () => {
     expect(nearestPalette('#466E50')!.id).toBe('forest');

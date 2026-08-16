@@ -113,11 +113,11 @@ function StartScreen({ onPick }: { onPick: (cfg: SiteConfig) => void }) {
           </div>
         </div>
         <div className="start-import">
-          <label htmlFor="imp">Already have a website? Paste its link, then pick a template — we&rsquo;ll pour your name, photos and details straight into it. <span className="imp-note">(The import is fetched through our server; the site you build still lives only in its link.)</span></label>
+          <label htmlFor="imp">Already have a website — or just a Facebook page? Paste the link, then pick a template — we&rsquo;ll pour your name, photos and details straight into it. <span className="imp-note">(The import is fetched through our server; the site you build still lives only in its link.)</span></label>
           <input
             id="imp"
             type="url"
-            placeholder="https://your-old-site.com  (optional)"
+            placeholder="your-old-site.com or facebook.com/yourpage  (optional)"
             value={importUrl}
             onChange={(e) => {
               setImportUrl(e.target.value);

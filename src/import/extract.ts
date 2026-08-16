@@ -100,11 +100,28 @@ function pageImages(doc: Document, baseUrl: string): string[] {
   return urls.filter(Boolean).slice(0, 7);
 }
 
+function isFacebook(baseUrl: string): boolean {
+  try {
+    return /(^|\.)facebook\.com$/i.test(new URL(baseUrl).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** "Name. 1.234 likes · 12 talking about this. The actual about text." → about text */
+function cleanFbDescription(desc: string, name: string): string {
+  let d = desc.trim();
+  if (name && d.startsWith(name)) d = d.slice(name.length).replace(/^[.\s]+/, '');
+  d = d.replace(/^[\d., \s]+likes?[^.]*\.\s*/i, '');
+  return d;
+}
+
 export function extractSite(html: string, baseUrl: string, template: SiteConfig): Extracted {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const config: SiteConfig = JSON.parse(JSON.stringify(template));
   const found: string[] = [];
   const ld = readJsonLd(doc);
+  const fb = isFacebook(baseUrl);
 
   /* ---- name ---- */
   const title =
@@ -118,15 +135,20 @@ export function extractSite(html: string, baseUrl: string, template: SiteConfig)
   }
 
   /* ---- description ---- */
-  const desc =
+  let desc =
     meta(doc, 'meta[property="og:description"]') || meta(doc, 'meta[name="description"]');
+  if (fb) desc = cleanFbDescription(desc, title);
   if (desc.length >= 30) {
     config.hero.lede = desc.slice(0, 340);
     found.push('description');
   }
 
   /* ---- images ---- */
-  const imgs = pageImages(doc, baseUrl);
+  // On Facebook only the og:image (profile photo) is the business's own —
+  // everything else in the no-JS page is UI sprites.
+  const imgs = fb
+    ? [absolute(meta(doc, 'meta[property="og:image"]'), baseUrl)].filter(Boolean)
+    : pageImages(doc, baseUrl);
   if (imgs.length) {
     config.hero.image = imgs[0];
     if (imgs.length > 1) config.gallery.images = imgs.slice(1);

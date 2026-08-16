@@ -3,6 +3,12 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "license": "MIT",
+  "author": "Cristian Tănase (https://github.com/Blondu2024)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Blondu2024/urlite.git"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",

@@ -34,6 +34,12 @@ export interface BeforeAfter {
   caption: string;
 }
 
+export interface LegalSection {
+  title: string;
+  /** long prose; blank lines split paragraphs */
+  body: string;
+}
+
 export interface ContactRow {
   label: string;
   value: string;
@@ -51,7 +57,7 @@ export interface SiteConfig {
   tagline: string; // small line used in <title> / meta
   logoText?: string; // 1-2 letters for the generated favicon monogram
 
-  nav: { services: string; work: string; gallery: string; contact: string };
+  nav: { services: string; work: string; gallery: string; contact: string; legal?: string };
 
   hero: {
     image: string;
@@ -60,6 +66,8 @@ export interface SiteConfig {
     title: string;
     lede: string;
     ctaPrimary: string;
+    /** optional URL for the primary CTA (app store listing etc.); wins over tel */
+    ctaHref?: string;
     /** tel number the primary CTA and phone pill dial */
     phone: string;
     phoneDisplay: string;
@@ -101,6 +109,9 @@ export interface SiteConfig {
   };
 
   gallery: { on: boolean; headKicker: string; headTitle: string; images: string[] };
+
+  /** long-prose blocks (privacy policy, terms) — the app-store one-pager */
+  legal: { on: boolean; headKicker: string; headTitle: string; sections: LegalSection[] };
 
   contact: {
     headKicker: string;

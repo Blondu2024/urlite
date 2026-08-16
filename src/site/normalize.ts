@@ -1,4 +1,4 @@
-import type { BeforeAfter, ContactRow, HeroStat, Service, SiteConfig, Theme } from './types';
+import type { BeforeAfter, ContactRow, HeroStat, LegalSection, Service, SiteConfig, Theme } from './types';
 import { PALETTES } from './palettes';
 import { ICONS } from './icons';
 import { safeColor } from './sanitize';
@@ -49,6 +49,13 @@ function ba(raw: unknown): BeforeAfter {
   };
 }
 
+function legalSection(raw: unknown): LegalSection {
+  const o = O(raw);
+  // A real privacy policy is long prose — the cap is per section, and deflate
+  // shrinks legal boilerplate hard, so the link stays shareable.
+  return { title: S(o.title, 90), body: S(o.body, 6000) };
+}
+
 function contactRow(raw: unknown): ContactRow {
   const o = O(raw);
   const row: ContactRow = { label: S(o.label, 40), value: S(o.value, 160) };
@@ -68,6 +75,7 @@ export function normalizeConfig(raw: unknown): SiteConfig {
   const work = O(o.work);
   const band = O(o.band);
   const gallery = O(o.gallery);
+  const legal = O(o.legal);
   const contact = O(o.contact);
   const footer = O(o.footer);
   const nav = O(o.nav);
@@ -85,6 +93,7 @@ export function normalizeConfig(raw: unknown): SiteConfig {
       work: S(nav.work, 30),
       gallery: S(nav.gallery, 30),
       contact: S(nav.contact, 30),
+      legal: S(nav.legal, 30) || undefined,
     },
     hero: {
       image: S(hero.image, 600),
@@ -92,6 +101,7 @@ export function normalizeConfig(raw: unknown): SiteConfig {
       title: S(hero.title, 140),
       lede: S(hero.lede, 340),
       ctaPrimary: S(hero.ctaPrimary, 50),
+      ctaHref: S(hero.ctaHref, 400) || undefined,
       phone: S(hero.phone, 30),
       phoneDisplay: S(hero.phoneDisplay, 30),
       ctaSecondary: S(hero.ctaSecondary, 50),
@@ -135,6 +145,12 @@ export function normalizeConfig(raw: unknown): SiteConfig {
       headKicker: S(gallery.headKicker, 60),
       headTitle: S(gallery.headTitle, 90),
       images: A(gallery.images, 6).map((x) => S(x, 600)),
+    },
+    legal: {
+      on: B(legal.on, false),
+      headKicker: S(legal.headKicker, 60),
+      headTitle: S(legal.headTitle, 90),
+      sections: A(legal.sections, 5).map(legalSection),
     },
     contact: {
       headKicker: S(contact.headKicker, 60),

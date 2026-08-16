@@ -51,6 +51,11 @@ interface CopyPack {
   rows: { label: string; value: string; href?: string; sub?: string }[];
   footLine: string;
   footNote: string;
+  /* app-page extras: long-prose legal blocks + their nav label */
+  navLegal?: string;
+  legalKicker?: string;
+  legalTitle?: string;
+  legalSections?: [string, string][]; // [title, body]
 }
 
 interface PresetImages {
@@ -71,6 +76,8 @@ export interface Preset {
   band: boolean;
   copy: Record<Lang, CopyPack>;
   phone: Record<Lang, [string, string]>; // [tel, display]
+  /** primary hero CTA links here instead of dialling (app store listing) */
+  ctaHref?: string;
 }
 
 function assemble(p: Preset, lang: Lang): SiteConfig {
@@ -91,13 +98,14 @@ function assemble(p: Preset, lang: Lang): SiteConfig {
     brandName: c.brandName,
     tagline: c.tagline,
     logoText: c.brandName.slice(0, 1),
-    nav: { services: c.nav[0], work: c.nav[1], gallery: c.nav[2], contact: c.nav[3] },
+    nav: { services: c.nav[0], work: c.nav[1], gallery: c.nav[2], contact: c.nav[3], legal: c.navLegal },
     hero: {
       image: p.images.hero,
       kicker: c.kicker,
       title: c.title,
       lede: c.lede,
       ctaPrimary: c.ctaPrimary,
+      ctaHref: p.ctaHref,
       phone,
       phoneDisplay,
       ctaSecondary: c.ctaSecondary,
@@ -141,6 +149,12 @@ function assemble(p: Preset, lang: Lang): SiteConfig {
       ctaSmallBottom: c.bandBottom,
     },
     gallery: { on: true, headKicker: c.galKicker, headTitle: c.galTitle, images: p.images.gallery },
+    legal: {
+      on: (c.legalSections ?? []).length > 0,
+      headKicker: c.legalKicker ?? '',
+      headTitle: c.legalTitle ?? '',
+      sections: (c.legalSections ?? []).map(([title, body]) => ({ title, body })),
+    },
     contact: { headKicker: c.cKicker, headTitle: c.cTitle, lede: c.cLede, cta: c.cCta, rows: c.rows },
     footer: { line: c.footLine, note: c.footNote },
   };
@@ -1164,7 +1178,343 @@ const auto: Preset = {
   },
 };
 
-export const PRESETS: Preset[] = [garden, painter, restaurant, salon, auto];
+/* ================================ APP PAGE ================================ */
+/* The one-pager Apple/Google require for a store listing: what the app does,
+   plus the privacy policy and terms — promised publicly on LinkedIn, 16 Aug 2026.
+   Every image verified visually (subject, not just HTTP 200) on 2026-08-16. */
+
+const APP_LEGAL_EN: [string, string][] = [
+  [
+    'Privacy Policy',
+    `Last updated: replace this line with your own date.
+
+Daylist does not collect, sell or share personal data. There is no account, no sign-up and no server: everything you write stays in the app's storage on your own device.
+
+Data you create. Your plans, notes and settings are stored locally on your phone. They are never transmitted to us or to anyone else. Deleting the app deletes them.
+
+Analytics and tracking. The app contains no analytics, no advertising SDKs and no third-party trackers of any kind.
+
+Permissions. Notifications are requested only if you turn reminders on, and are used for nothing else. The app asks for no other permissions.
+
+Backups. If you use the export feature, the file is written where you choose and handled by you. If your operating system backs the app up (for example a device backup), that backup is governed by your OS vendor's policy, not ours.
+
+Children. The app collects no data from anyone, including children.
+
+Changes. If this policy ever changes, the new version will be published on this page with a new date at the top.
+
+Contact. Questions about privacy: support@daylist.app.`,
+  ],
+  [
+    'Terms of Use',
+    `By downloading or using Daylist you agree to these terms.
+
+Licence. You get a personal, non-transferable licence to use the app on devices you own. The app and its design remain the property of the developer.
+
+Your content. Whatever you write in the app is yours. Because it is stored only on your device, you are responsible for keeping backups — use the export feature.
+
+No warranty. The app is provided "as is", without warranty of any kind. To the maximum extent permitted by law, the developer is not liable for lost data or any damages arising from the use of the app.
+
+Fair use. Do not reverse-engineer, resell or redistribute the app.
+
+Changes. These terms may be updated from time to time; continued use after an update means you accept the new version.
+
+Governing law. Replace this line with your own jurisdiction.
+
+Contact: support@daylist.app.`,
+  ],
+];
+
+const APP_LEGAL_RO: [string, string][] = [
+  [
+    'Politica de confidențialitate',
+    `Ultima actualizare: înlocuiește rândul acesta cu data ta.
+
+Daylist nu colectează, nu vinde și nu partajează date personale. Nu există cont, înregistrare sau server: tot ce scrii rămâne în memoria aplicației, pe telefonul tău.
+
+Datele tale. Planurile, notițele și setările sunt stocate local, pe dispozitiv. Nu ne sunt transmise nici nouă, nici altcuiva. Ștergerea aplicației le șterge și pe ele.
+
+Analiză și urmărire. Aplicația nu conține analytics, SDK-uri de publicitate sau alte instrumente de urmărire.
+
+Permisiuni. Notificările sunt cerute doar dacă activezi memento-urile și nu sunt folosite pentru nimic altceva. Aplicația nu cere alte permisiuni.
+
+Copii de siguranță. Dacă folosești exportul, fișierul e salvat unde alegi tu și e responsabilitatea ta. Dacă sistemul de operare face backup aplicației, acel backup ține de politica producătorului sistemului, nu de a noastră.
+
+Copii. Aplicația nu colectează date de la nimeni, inclusiv de la copii.
+
+Modificări. Dacă politica se schimbă vreodată, versiunea nouă apare pe această pagină, cu dată nouă.
+
+Contact. Întrebări despre confidențialitate: support@daylist.app.`,
+  ],
+  [
+    'Termeni de utilizare',
+    `Prin descărcarea sau folosirea Daylist ești de acord cu acești termeni.
+
+Licență. Primești o licență personală, netransferabilă, pentru dispozitivele tale. Aplicația și designul ei rămân proprietatea dezvoltatorului.
+
+Conținutul tău. Ce scrii în aplicație îți aparține. Fiindcă e stocat doar pe dispozitivul tău, copiile de siguranță sunt responsabilitatea ta — folosește exportul.
+
+Fără garanții. Aplicația e oferită „ca atare", fără nicio garanție. În limita maximă permisă de lege, dezvoltatorul nu răspunde pentru date pierdute sau alte daune rezultate din folosirea aplicației.
+
+Utilizare corectă. Nu decompila, revinde sau redistribui aplicația.
+
+Modificări. Termenii pot fi actualizați; folosirea în continuare după o actualizare înseamnă acceptarea versiunii noi.
+
+Legea aplicabilă. Înlocuiește rândul acesta cu jurisdicția ta.
+
+Contact: support@daylist.app.`,
+  ],
+];
+
+const APP_LEGAL_DA: [string, string][] = [
+  [
+    'Privatlivspolitik',
+    `Senest opdateret: erstat denne linje med din egen dato.
+
+Daylist indsamler, sælger eller deler ikke persondata. Der er ingen konto, ingen tilmelding og ingen server: alt hvad du skriver, bliver i appens lager på din egen enhed.
+
+Dine data. Planer, noter og indstillinger gemmes lokalt på telefonen. De sendes aldrig til os eller andre. Sletter du appen, slettes de også.
+
+Analyse og sporing. Appen indeholder ingen analytics, ingen reklame-SDK'er og ingen tredjepartssporing.
+
+Tilladelser. Notifikationer bruges kun, hvis du slår påmindelser til, og til intet andet. Appen beder ikke om andre tilladelser.
+
+Backup. Bruger du eksport, gemmes filen hvor du vælger, og håndteres af dig. Hvis styresystemet tager backup af appen, gælder leverandørens politik, ikke vores.
+
+Børn. Appen indsamler ingen data fra nogen, heller ikke børn.
+
+Ændringer. Ændres politikken, offentliggøres den nye version på denne side med ny dato.
+
+Kontakt. Spørgsmål om privatliv: support@daylist.app.`,
+  ],
+  [
+    'Vilkår for brug',
+    `Ved at hente eller bruge Daylist accepterer du disse vilkår.
+
+Licens. Du får en personlig licens, der ikke kan overdrages, til enheder du ejer. Appen og dens design tilhører udvikleren.
+
+Dit indhold. Det du skriver i appen, er dit. Da det kun gemmes på din enhed, er backup dit ansvar — brug eksportfunktionen.
+
+Ingen garanti. Appen leveres "som den er", uden nogen form for garanti. I det omfang loven tillader det, hæfter udvikleren ikke for tabte data eller andre skader ved brug af appen.
+
+Rimelig brug. Appen må ikke dekompileres, videresælges eller videredistribueres.
+
+Ændringer. Vilkårene kan opdateres; fortsat brug efter en opdatering betyder, at du accepterer den nye version.
+
+Lovvalg. Erstat denne linje med din egen jurisdiktion.
+
+Kontakt: support@daylist.app.`,
+  ],
+];
+
+const app: Preset = {
+  id: 'app',
+  paletteId: 'midnight',
+  label: { en: 'App page (store listing)', ro: 'Pagină de aplicație', da: 'App-side' },
+  icons: ['bolt', 'clock', 'shield', 'star', 'sparkle', 'pin'],
+  images: {
+    hero: U('1551650975-87deedd944c3'),
+    statement: U('1498050108023-c5249f4df085', 1200),
+    work: [],
+    gallery: [
+      U('1510557880182-3d4d3cba35a5', 1000),
+      U('1512941937669-90a1b58e7e9c', 1200),
+      U('1484480974693-6ca0a78fb36b', 1200),
+      U('1555421689-491a97ff2040', 1000),
+    ],
+  },
+  ticker: true,
+  work: false,
+  band: false,
+  ctaHref: 'https://apps.apple.com/',
+  phone: { en: ['', ''], ro: ['', ''], da: ['', ''] },
+  copy: {
+    en: {
+      brandName: 'Daylist',
+      tagline: 'The calm daily planner',
+      nav: ['Features', '', 'Screenshots', 'Contact'],
+      navLegal: 'Privacy & terms',
+      kicker: 'iOS & Android',
+      title: 'Your whole day, *on one quiet page.*',
+      lede: 'Daylist is a daily planner that opens in a second, works offline and never asks you to create an account. Write the day down, tick it off, close the app.',
+      ctaPrimary: 'Download the app',
+      ctaSecondary: 'See the screens',
+      stats: [
+        ['4.9', 'Average store rating'],
+        ['Free', 'No ads, no subscription'],
+        ['Offline', 'Your data stays on your phone'],
+      ],
+      ticker: ['Free on iOS & Android', 'No account needed', 'Works offline', 'No ads, ever'],
+      stBig: 'Built by one person, not a data company.',
+      stText:
+        'Daylist has no growth team and no advertisers to feed. It keeps your plans on your phone, sends nothing anywhere, and gets out of your way the moment the day is planned.',
+      svcKicker: 'What it does',
+      svcTitle: 'Everything a paper planner does, *minus the paper.*',
+      svcLede: 'Six things, done properly. No feature creep, no “workspace”, no assistant reading your groceries.',
+      services: [
+        ['Opens in a second', 'Cold start to writing in under a second — a planner only works when it is faster than forgetting.'],
+        ['Gentle reminders', 'One nudge, at the time you chose. No streaks, no guilt screens, no “we miss you”.'],
+        ['Private by design', 'Everything lives on your device. No account, no cloud, no analytics watching you type.'],
+        ['Today rolls over', 'Unfinished items move to tomorrow by themselves, so mornings never start with yesterday’s noise.'],
+        ['Widgets & dark mode', 'Your day on the home screen, in a theme that follows the system.'],
+        ['Backups you control', 'Export everything to a single file whenever you like — and import it on a new phone.'],
+      ],
+      extrasLabel: 'Also in the box:',
+      extras: ['Search', 'Home-screen widgets', 'Markdown notes', 'File export'],
+      workKicker: '',
+      workTitle: '',
+      workLede: '',
+      labelBefore: 'Before',
+      labelAfter: 'After',
+      workItems: [],
+      bandKicker: '',
+      bandTitle: '',
+      bandText: '',
+      bandTop: '',
+      bandBottom: '',
+      galKicker: 'Screenshots',
+      galTitle: 'The app, as it looks',
+      legalKicker: 'The fine print',
+      legalTitle: 'Privacy policy *& terms.*',
+      legalSections: APP_LEGAL_EN,
+      cKicker: 'Get it',
+      cTitle: 'Free, on both stores.',
+      cLede: 'Questions, bug reports or feature ideas — one developer reads every email.',
+      cCta: '',
+      rows: [
+        { label: 'App Store', value: 'Daylist for iPhone', href: 'https://apps.apple.com/' },
+        { label: 'Google Play', value: 'Daylist for Android', href: 'https://play.google.com/store' },
+        { label: 'Support', value: 'support@daylist.app', href: 'mailto:support@daylist.app' },
+        { label: 'Press kit', value: 'daylist.app/press' },
+      ],
+      footLine: 'Made in a kitchen, shipped worldwide.',
+      footNote: 'Demo website — replace every word (and both store links) with your own before sending.',
+    },
+    ro: {
+      brandName: 'Daylist',
+      tagline: 'Plannerul zilnic liniștit',
+      nav: ['Funcții', '', 'Capturi de ecran', 'Contact'],
+      navLegal: 'Confidențialitate',
+      kicker: 'iOS & Android',
+      title: 'Toată ziua ta, *pe o singură pagină liniștită.*',
+      lede: 'Daylist e un planner zilnic care se deschide într-o secundă, merge offline și nu-ți cere niciodată cont. Îți scrii ziua, bifezi, închizi aplicația.',
+      ctaPrimary: 'Descarcă aplicația',
+      ctaSecondary: 'Vezi ecranele',
+      stats: [
+        ['4,9', 'Rating mediu în store'],
+        ['Gratuit', 'Fără reclame, fără abonament'],
+        ['Offline', 'Datele rămân pe telefonul tău'],
+      ],
+      ticker: ['Gratuit pe iOS & Android', 'Fără cont', 'Merge offline', 'Fără reclame, niciodată'],
+      stBig: 'Făcută de un singur om, nu de o companie de date.',
+      stText:
+        'Daylist nu are echipă de growth și nici advertiseri de hrănit. Îți ține planurile pe telefon, nu trimite nimic nicăieri și îți iese din cale imediat ce ziua e pusă pe hârtie.',
+      svcKicker: 'Ce face',
+      svcTitle: 'Tot ce face o agendă de hârtie, *minus hârtia.*',
+      svcLede: 'Șase lucruri, făcute ca lumea. Fără funcții de umplutură, fără „workspace", fără asistent care îți citește cumpărăturile.',
+      services: [
+        ['Se deschide într-o secundă', 'De la pornire la scris în sub o secundă — un planner funcționează doar dacă e mai rapid decât uitatul.'],
+        ['Memento-uri blânde', 'Un singur semnal, la ora aleasă de tine. Fără serii, fără ecrane de vinovăție, fără „ne e dor de tine".'],
+        ['Privat prin construcție', 'Totul stă pe dispozitivul tău. Fără cont, fără cloud, fără analytics care te urmărește cum tastezi.'],
+        ['Ziua se mută singură', 'Ce n-ai bifat trece singur pe mâine, ca dimineața să nu înceapă cu zgomotul de ieri.'],
+        ['Widgeturi & dark mode', 'Ziua ta pe ecranul principal, într-o temă care urmează sistemul.'],
+        ['Copii de siguranță la tine', 'Exporți totul într-un singur fișier oricând vrei — și îl imporți pe telefonul nou.'],
+      ],
+      extrasLabel: 'Tot în pachet:',
+      extras: ['Căutare', 'Widgeturi', 'Notițe Markdown', 'Export fișier'],
+      workKicker: '',
+      workTitle: '',
+      workLede: '',
+      labelBefore: 'Înainte',
+      labelAfter: 'După',
+      workItems: [],
+      bandKicker: '',
+      bandTitle: '',
+      bandText: '',
+      bandTop: '',
+      bandBottom: '',
+      galKicker: 'Capturi de ecran',
+      galTitle: 'Aplicația, așa cum arată',
+      legalKicker: 'Litera mică',
+      legalTitle: 'Confidențialitate *și termeni.*',
+      legalSections: APP_LEGAL_RO,
+      cKicker: 'Ia-o',
+      cTitle: 'Gratuit, în ambele store-uri.',
+      cLede: 'Întrebări, bug-uri sau idei — un singur dezvoltator citește fiecare email.',
+      cCta: '',
+      rows: [
+        { label: 'App Store', value: 'Daylist pentru iPhone', href: 'https://apps.apple.com/' },
+        { label: 'Google Play', value: 'Daylist pentru Android', href: 'https://play.google.com/store' },
+        { label: 'Suport', value: 'support@daylist.app', href: 'mailto:support@daylist.app' },
+        { label: 'Press kit', value: 'daylist.app/press' },
+      ],
+      footLine: 'Făcută într-o bucătărie, livrată în toată lumea.',
+      footNote: 'Site demo — înlocuiește fiecare cuvânt (și ambele linkuri de store) cu ale tale înainte să-l trimiți.',
+    },
+    da: {
+      brandName: 'Daylist',
+      tagline: 'Den rolige dagsplanlægger',
+      nav: ['Funktioner', '', 'Skærmbilleder', 'Kontakt'],
+      navLegal: 'Privatliv & vilkår',
+      kicker: 'iOS & Android',
+      title: 'Hele din dag, *på én rolig side.*',
+      lede: 'Daylist er en dagsplanlægger, der åbner på et sekund, virker offline og aldrig beder dig oprette en konto. Skriv dagen ned, sæt flueben, luk appen.',
+      ctaPrimary: 'Hent appen',
+      ctaSecondary: 'Se skærmene',
+      stats: [
+        ['4,9', 'Gennemsnitlig store-vurdering'],
+        ['Gratis', 'Ingen reklamer, intet abonnement'],
+        ['Offline', 'Dine data bliver på telefonen'],
+      ],
+      ticker: ['Gratis på iOS & Android', 'Ingen konto', 'Virker offline', 'Aldrig reklamer'],
+      stBig: 'Bygget af én person, ikke et datafirma.',
+      stText:
+        'Daylist har intet growth-team og ingen annoncører at fodre. Den holder dine planer på telefonen, sender intet nogen steder hen og går af vejen, så snart dagen er planlagt.',
+      svcKicker: 'Hvad den gør',
+      svcTitle: 'Alt hvad en papirkalender kan, *minus papiret.*',
+      svcLede: 'Seks ting, gjort ordentligt. Ingen overflødige funktioner, intet "workspace", ingen assistent der læser dine indkøb.',
+      services: [
+        ['Åbner på et sekund', 'Fra koldstart til skrivning på under et sekund — en planlægger virker kun, når den er hurtigere end glemslen.'],
+        ['Blide påmindelser', 'Ét prik, på det tidspunkt du valgte. Ingen streaks, ingen skyldskærme, intet "vi savner dig".'],
+        ['Privat fra bunden', 'Alt ligger på din enhed. Ingen konto, ingen sky, ingen analytics der kigger med.'],
+        ['Dagen ruller videre', 'Ufærdige punkter flytter selv til i morgen, så morgenen aldrig starter med gårsdagens støj.'],
+        ['Widgets & mørk tilstand', 'Din dag på hjemmeskærmen, i et tema der følger systemet.'],
+        ['Backup du selv styrer', 'Eksportér alt til én fil, når du vil — og importér den på en ny telefon.'],
+      ],
+      extrasLabel: 'Også med:',
+      extras: ['Søgning', 'Widgets', 'Markdown-noter', 'Fil-eksport'],
+      workKicker: '',
+      workTitle: '',
+      workLede: '',
+      labelBefore: 'Før',
+      labelAfter: 'Efter',
+      workItems: [],
+      bandKicker: '',
+      bandTitle: '',
+      bandText: '',
+      bandTop: '',
+      bandBottom: '',
+      galKicker: 'Skærmbilleder',
+      galTitle: 'Appen, som den ser ud',
+      legalKicker: 'Det med småt',
+      legalTitle: 'Privatlivspolitik *& vilkår.*',
+      legalSections: APP_LEGAL_DA,
+      cKicker: 'Hent den',
+      cTitle: 'Gratis, i begge butikker.',
+      cLede: 'Spørgsmål, fejl eller idéer — én udvikler læser hver eneste mail.',
+      cCta: '',
+      rows: [
+        { label: 'App Store', value: 'Daylist til iPhone', href: 'https://apps.apple.com/' },
+        { label: 'Google Play', value: 'Daylist til Android', href: 'https://play.google.com/store' },
+        { label: 'Support', value: 'support@daylist.app', href: 'mailto:support@daylist.app' },
+        { label: 'Pressekit', value: 'daylist.app/press' },
+      ],
+      footLine: 'Bygget i et køkken, sendt ud i verden.',
+      footNote: 'Demoside — udskift hvert ord (og begge store-links) med dine egne, før du sender den.',
+    },
+  },
+};
+
+export const PRESETS: Preset[] = [garden, painter, restaurant, salon, auto, app];
 
 export function buildPreset(presetId: string, lang: Lang): SiteConfig {
   const p = PRESETS.find((x) => x.id === presetId) ?? PRESETS[0];

@@ -69,12 +69,15 @@ export function renderSiteHTML(c: SiteConfig, opts: RenderOptions = {}): string 
   const hasWork = c.work.on && workItems.length > 0;
   const galleryImages = c.gallery.images.map(safeImageUrl).filter(Boolean);
   const hasGallery = c.gallery.on && galleryImages.length > 0;
+  const legalSections = c.legal.sections.filter((s) => s.title || s.body);
+  const hasLegal = c.legal.on && legalSections.length > 0;
 
   /* ---------- nav ---------- */
   const navLinks = [
     hasServices && c.nav.services ? `<a class="nlink" href="#services">${esc(c.nav.services)}</a>` : '',
     hasWork && c.nav.work ? `<a class="nlink" href="#work">${esc(c.nav.work)}</a>` : '',
     hasGallery && c.nav.gallery ? `<a class="nlink" href="#gallery">${esc(c.nav.gallery)}</a>` : '',
+    hasLegal && c.nav.legal ? `<a class="nlink" href="#legal">${esc(c.nav.legal)}</a>` : '',
     c.nav.contact ? `<a class="nlink" href="#contact">${esc(c.nav.contact)}</a>` : '',
   ]
     .filter(Boolean)
@@ -91,8 +94,10 @@ export function renderSiteHTML(c: SiteConfig, opts: RenderOptions = {}): string 
     .filter((s) => s.big || s.small)
     .map((s) => `<div class="cell rv-h"><b>${esc(s.big)}</b><small>${esc(s.small)}</small></div>`)
     .join('\n      ');
+  /* the primary CTA can point at a URL (app store listing); the phone is the fallback */
+  const primaryHref = safeHref(c.hero.ctaHref ?? '') || tel;
   const heroCtas = [
-    tel && c.hero.ctaPrimary ? `<a class="btn btn-y" href="${tel}">${esc(c.hero.ctaPrimary)}</a>` : '',
+    primaryHref && c.hero.ctaPrimary ? `<a class="btn btn-y" href="${esc(primaryHref)}">${esc(c.hero.ctaPrimary)}</a>` : '',
     c.hero.ctaSecondary
       ? `<a class="btn btn-g" href="#${hasWork ? 'work' : hasGallery ? 'gallery' : 'contact'}">${esc(c.hero.ctaSecondary)}</a>`
       : '',
@@ -222,6 +227,33 @@ ${sliders}
     <div class="gal">
       ${galleryFigs}
     </div>
+  </div></section>`
+    : '';
+
+  /* ---------- legal (privacy policy / terms — the app-store one-pager) ---------- */
+  const legalBlocks = legalSections
+    .map((s) => {
+      const paras = s.body
+        .split(/\n{2,}/)
+        .map((p) => p.trim())
+        .filter(Boolean)
+        .map((p) => `<p>${esc(p).replace(/\n/g, '<br>')}</p>`)
+        .join('\n        ');
+      return `<article class="lg rv">
+      <h3>${esc(s.title)}</h3>
+      <div class="lg-body">
+        ${paras}
+      </div>
+    </article>`;
+    })
+    .join('\n');
+  const legalSec = hasLegal
+    ? `<section id="legal" class="legal"><div class="wrap">
+    <div class="sec-head"><div>
+      <p class="kicker rv">${esc(c.legal.headKicker)}</p>
+      <h2 class="d2 rv" style="margin-top:20px">${accentise(esc(c.legal.headTitle))}</h2>
+    </div></div>
+${legalBlocks}
   </div></section>`
     : '';
 
@@ -500,6 +532,15 @@ section{padding-block:clamp(72px,10vw,144px);scroll-margin-top:80px}
   .gal figure{grid-column:span 1!important;aspect-ratio:4/5!important}
 }
 
+/* legal prose — editorial two-column rows, same skeleton as the service list */
+.legal{background:var(--paper-2)}
+.lg{display:grid;grid-template-columns:minmax(0,.5fr) minmax(0,1fr);
+  gap:clamp(16px,3vw,56px);padding:clamp(26px,4vw,44px) 0;border-top:1px solid var(--line)}
+.lg h3{font-size:clamp(1.35rem,2.4vw,1.9rem)}
+.lg-body p{margin:0 0 1em;color:var(--ink-2);font-size:.95rem;line-height:1.7;max-width:70ch}
+.lg-body p:last-child{margin-bottom:0}
+@media(max-width:820px){.lg{grid-template-columns:1fr}}
+
 .contact{background:var(--ink-deep);color:#fff}
 .contact .kicker{color:var(--accent)}
 .contact .d2{color:#fff}
@@ -566,6 +607,7 @@ ${servicesSec}
 ${workSec}
 ${bandSec}
 ${gallerySec}
+${legalSec}
 ${contactSec}
 
 <footer>

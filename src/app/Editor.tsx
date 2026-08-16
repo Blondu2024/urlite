@@ -255,6 +255,12 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
               <Text label="Primary button" value={config.hero.ctaPrimary} onChange={(v) => up((d) => (d.hero.ctaPrimary = v))} />
               <Text label="Secondary button" value={config.hero.ctaSecondary} onChange={(v) => up((d) => (d.hero.ctaSecondary = v))} />
             </div>
+            <Text
+              label="Primary button link (optional)"
+              value={config.hero.ctaHref ?? ''}
+              onChange={(v) => up((d) => (d.hero.ctaHref = v || undefined))}
+              hint="https://… (an app-store listing, a booking page). Wins over the phone number."
+            />
             <div className="f-row">
               <Text label="Phone (with country code)" value={config.hero.phone} onChange={(v) => up((d) => (d.hero.phone = v))} />
               <Text label="Phone, as shown" value={config.hero.phoneDisplay} onChange={(v) => up((d) => (d.hero.phoneDisplay = v))} />
@@ -381,6 +387,35 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
             {config.gallery.images.length < 6 && (
               <button className="add-row" onClick={() => up((d) => d.gallery.images.push(''))}>
                 + Add a photo
+              </button>
+            )}
+          </Acc>
+
+          <Acc title="Legal pages" pill={config.legal.on ? String(config.legal.sections.length) : 'off'}>
+            <Toggle label="Show the legal section" value={config.legal.on} onChange={(v) => up((d) => (d.legal.on = v))} />
+            <Text label="Kicker" value={config.legal.headKicker} onChange={(v) => up((d) => (d.legal.headKicker = v))} />
+            <Text label="Title" value={config.legal.headTitle} onChange={(v) => up((d) => (d.legal.headTitle = v))} />
+            <Text
+              label="Menu label (optional)"
+              value={config.nav.legal ?? ''}
+              onChange={(v) => up((d) => (d.nav.legal = v || undefined))}
+              hint="Shown in the top menu, linking to this section."
+            />
+            {config.legal.sections.map((s, i) => (
+              <ListItem key={i} n={i + 1} title={s.title} onDelete={() => up((d) => d.legal.sections.splice(i, 1))}>
+                <Text label="Heading" value={s.title} onChange={(v) => up((d) => (d.legal.sections[i].title = v))} />
+                <Area
+                  label="Text"
+                  value={s.body}
+                  onChange={(v) => up((d) => (d.legal.sections[i].body = v))}
+                  rows={10}
+                  hint="A blank line starts a new paragraph."
+                />
+              </ListItem>
+            ))}
+            {config.legal.sections.length < 5 && (
+              <button className="add-row" onClick={() => up((d) => d.legal.sections.push({ title: 'Privacy Policy', body: '' }))}>
+                + Add a legal block
               </button>
             )}
           </Acc>

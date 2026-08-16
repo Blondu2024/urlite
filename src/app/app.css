@@ -316,6 +316,16 @@ input, textarea, select { font: inherit; color: inherit; }
 .share-actions { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
 
 @media (max-width: 900px) {
+  /* Bug #5 (16 aug, mobile): the bar's children are wider than a phone
+     viewport at min-content, and flex items never shrink below that — so
+     without wrap the bar dragged the whole page into horizontal scroll. */
+  .ed-top { height: auto; min-height: 60px; flex-wrap: wrap; padding: 10px 12px; gap: 8px 10px; }
+  .ed-sep { display: none; }
+  /* Pack two tidy rows instead of three: the spacer would exile the device
+     segment to its own row, and the roomy paddings pushed Share off row two. */
+  .ed-top .spacer { display: none; }
+  .seg button { padding: 6px 11px; }
+  .kb-badge { padding: 5px 9px; }
   .ed-body { flex-direction: column; }
   .panel { width: 100%; order: 2; border-right: 0; border-top: 1px solid var(--line); max-height: 45svh; }
   .stage { order: 1; min-height: 45svh; }

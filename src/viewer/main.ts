@@ -22,7 +22,7 @@ function show(): void {
     }
     return;
   }
-  const html = renderSiteHTML(normalizeConfig(raw), { appUrl: appUrl() + '/app' });
+  const html = renderSiteHTML(normalizeConfig(raw), { appUrl: appUrl() + '/app', viewerBadge: true });
   document.open();
   document.write(html);
   document.close();

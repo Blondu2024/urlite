@@ -2,5 +2,15 @@
   "cleanUrls": true,
   "rewrites": [
     { "source": "/app", "destination": "/" }
+  ],
+  "headers": [
+    {
+      "source": "/s/(.*)",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    },
+    {
+      "source": "/s",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    }
   ]
 }

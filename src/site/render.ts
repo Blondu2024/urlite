@@ -25,6 +25,13 @@ export interface RenderOptions {
    * the shared link and the HTML export never set this.
    */
   still?: boolean;
+  /**
+   * Small fixed badge naming the page as a visitor-made Urlite site, with a
+   * report link. Set ONLY by the /s/ viewer — pages under urlite.app must
+   * declare what they are (Safe Browsing "deceptive pages" incident, 16 Aug
+   * 2026); a client's exported HTML on their own host stays clean.
+   */
+  viewerBadge?: boolean;
 }
 
 const esc = escHtml;
@@ -564,6 +571,14 @@ footer .note{margin-left:auto;font-size:.76rem;color:rgba(255,255,255,.3);max-wi
 footer .credit{flex-basis:100%;font-size:.72rem;color:rgba(255,255,255,.28)}
 footer .credit a{border-bottom:1px solid rgba(255,255,255,.2)}
 footer .credit a:hover{color:rgba(255,255,255,.7)}
+${opts.viewerBadge ? `.ul-badge{position:fixed;bottom:12px;left:12px;z-index:99;display:flex;gap:6px;align-items:center;
+  background:rgba(20,20,20,.82);color:rgba(255,255,255,.85);backdrop-filter:blur(8px);
+  font-size:.7rem;line-height:1;padding:7px 11px;border-radius:99px;
+  box-shadow:0 4px 18px rgba(0,0,0,.3)}
+.ul-badge a{color:inherit;border-bottom:1px solid rgba(255,255,255,.3)}
+.ul-badge a:hover{color:#fff}
+.ul-badge i{font-style:normal;opacity:.45}
+` : ''}
 </style>
 </head>
 <body>
@@ -619,6 +634,11 @@ ${contactSec}
   </div>
 </footer>
 
+${
+  opts.viewerBadge
+    ? `<div class="ul-badge">a visitor-made site, made with <a href="${esc(appUrl)}" rel="noopener">Urlite</a><i>·</i><a href="https://github.com/Blondu2024/urlite/issues" rel="noopener">report</a></div>`
+    : ''
+}
 ${opts.still ? '' : `<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" defer></script>`}
 <script>

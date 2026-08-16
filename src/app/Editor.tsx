@@ -6,6 +6,7 @@ import { renderSiteHTML } from '../site/render';
 import { PALETTES } from '../site/palettes';
 import { buildPreset, PRESETS, type Lang } from '../site/presets';
 import { Acc, Area, IconPicker, ImageField, Text, Toggle } from './fields';
+import { importSite } from '../import/importSite';
 import { Share } from './Share';
 
 const DRAFT_KEY = 'urlite-draft';
@@ -67,11 +68,31 @@ function ListItem(props: {
 
 function StartScreen({ onPick }: { onPick: (cfg: SiteConfig) => void }) {
   const [lang, setLang] = useState<Lang>('en');
+  const [importUrl, setImportUrl] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [impError, setImpError] = useState('');
   const langs: [Lang, string][] = [
     ['en', 'English'],
     ['ro', 'Română'],
     ['da', 'Dansk'],
   ];
+
+  const pick = async (presetId: string) => {
+    if (importing) return;
+    const template = buildPreset(presetId, lang);
+    const url = importUrl.trim();
+    if (!url) return onPick(template);
+    setImporting(true);
+    setImpError('');
+    try {
+      const { config, found } = await importSite(url, template);
+      onPick(found.length ? config : template);
+    } catch (e) {
+      setImporting(false);
+      setImpError(e instanceof Error ? e.message : 'Could not read that page.');
+    }
+  };
+
   return (
     <div className="start">
       <div className="start-main">
@@ -91,9 +112,25 @@ function StartScreen({ onPick }: { onPick: (cfg: SiteConfig) => void }) {
             ))}
           </div>
         </div>
-        <div className="start-grid">
+        <div className="start-import">
+          <label htmlFor="imp">Already have a website? Paste its link, then pick a template — we&rsquo;ll pour your name, photos and details straight into it. <span className="imp-note">(The import is fetched through our server; the site you build still lives only in its link.)</span></label>
+          <input
+            id="imp"
+            type="url"
+            placeholder="https://your-old-site.com  (optional)"
+            value={importUrl}
+            onChange={(e) => {
+              setImportUrl(e.target.value);
+              setImpError('');
+            }}
+            disabled={importing}
+          />
+          {importing && <span className="imp-status">Reading your site… it takes a few seconds.</span>}
+          {impError && <span className="imp-status imp-err">{impError} You can fix the link and try again, or clear it and start from the template alone.</span>}
+        </div>
+        <div className="start-grid" style={importing ? { opacity: 0.5, pointerEvents: 'none' } : undefined}>
           {PRESETS.map((p) => (
-            <button key={p.id} className="demo-card" onClick={() => onPick(buildPreset(p.id, lang))}>
+            <button key={p.id} className="demo-card" onClick={() => pick(p.id)}>
               <img src={p.images.hero} alt="" loading="lazy" />
               <span className="dc">
                 <b className="serif">{p.label[lang]}</b>

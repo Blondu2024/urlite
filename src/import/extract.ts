@@ -116,6 +116,13 @@ function cleanFbDescription(desc: string, name: string): string {
   return d;
 }
 
+/** Visible page text, capped — this is all the rewrite model gets to read. */
+export function readableText(html: string): string {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  for (const el of doc.querySelectorAll('script,style,noscript,svg,iframe,template')) el.remove();
+  return (doc.body?.textContent ?? '').replace(/\s+/g, ' ').trim().slice(0, 6000);
+}
+
 export function extractSite(html: string, baseUrl: string, template: SiteConfig): Extracted {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const config: SiteConfig = JSON.parse(JSON.stringify(template));

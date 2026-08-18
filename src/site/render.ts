@@ -32,6 +32,13 @@ export interface RenderOptions {
    * 2026); a client's exported HTML on their own host stays clean.
    */
   viewerBadge?: boolean;
+  /**
+   * URL → `data:image/…` map, produced by `embedImages()` at export time: the
+   * downloaded file has no link-size limit, so the photos travel inside it.
+   * Images missing from the map keep their URL. Only the HTML export sets
+   * this — preview, viewer and link stay on plain URLs.
+   */
+  imageData?: Record<string, string>;
 }
 
 const esc = escHtml;
@@ -41,8 +48,7 @@ function accentise(escaped: string): string {
   return escaped.replace(/\*([^*]+)\*/g, '<em>$1</em>');
 }
 
-function img(url: string, alt: string, extra = ''): string {
-  const src = safeImageUrl(url);
+function imgTag(src: string, alt: string, extra = ''): string {
   if (!src) return '';
   return `<img src="${esc(src)}" alt="${esc(alt)}"${extra ? ' ' + extra : ''}>`;
 }
@@ -71,10 +77,18 @@ export function renderSiteHTML(c: SiteConfig, opts: RenderOptions = {}): string 
   const tel = telHref(c.hero.phone);
   const appUrl = opts.appUrl ?? 'https://urlite.app';
 
+  /* sanitised URL, swapped for its packed data: URI when the export carries one */
+  const resolveImg = (url: string): string => {
+    const src = safeImageUrl(url);
+    if (!src) return '';
+    const packed = opts.imageData?.[src];
+    return packed && packed.startsWith('data:image/') ? packed : src;
+  };
+
   const hasServices = c.services.items.length > 0;
   const workItems = c.work.items.filter((w) => safeImageUrl(w.before) && safeImageUrl(w.after));
   const hasWork = c.work.on && workItems.length > 0;
-  const galleryImages = c.gallery.images.map(safeImageUrl).filter(Boolean);
+  const galleryImages = c.gallery.images.map(resolveImg).filter(Boolean);
   const hasGallery = c.gallery.on && galleryImages.length > 0;
   const legalSections = c.legal.sections.filter((s) => s.title || s.body);
   const hasLegal = c.legal.on && legalSections.length > 0;
@@ -96,7 +110,7 @@ export function renderSiteHTML(c: SiteConfig, opts: RenderOptions = {}): string 
       : '';
 
   /* ---------- hero ---------- */
-  const heroImg = img(c.hero.image, '', 'fetchpriority="high"');
+  const heroImg = imgTag(resolveImg(c.hero.image), '', 'fetchpriority="high"');
   const stats = c.hero.stats
     .filter((s) => s.big || s.small)
     .map((s) => `<div class="cell rv-h"><b>${esc(s.big)}</b><small>${esc(s.small)}</small></div>`)
@@ -123,7 +137,7 @@ export function renderSiteHTML(c: SiteConfig, opts: RenderOptions = {}): string 
       : '';
 
   /* ---------- statement ---------- */
-  const stImg = img(c.statement.image, '');
+  const stImg = imgTag(resolveImg(c.statement.image), '');
   const statement =
     c.statement.on && (c.statement.big || c.statement.text)
       ? `<section class="statement"><div class="wrap st-grid${stImg ? '' : ' st-solo'}">
@@ -174,8 +188,8 @@ ${serviceRows}
     .map(
       (w) => `<div class="ba rv-i">
       <div class="slider" style="aspect-ratio:14/9" data-slider>
-        <img class="before" src="${esc(safeImageUrl(w.before))}" alt="${esc(c.work.labelBefore)}: ${esc(w.title)}" draggable="false">
-        <img class="after" src="${esc(safeImageUrl(w.after))}" alt="${esc(c.work.labelAfter)}: ${esc(w.title)}" draggable="false">
+        <img class="before" src="${esc(resolveImg(w.before))}" alt="${esc(c.work.labelBefore)}: ${esc(w.title)}" draggable="false">
+        <img class="after" src="${esc(resolveImg(w.after))}" alt="${esc(c.work.labelAfter)}: ${esc(w.title)}" draggable="false">
         <span class="lab b">${esc(c.work.labelBefore)}</span><span class="lab a">${esc(c.work.labelAfter)}</span>
         <i class="handle" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6 4 12l5 6M15 6l5 6-5 6"/></svg></i>
       </div>

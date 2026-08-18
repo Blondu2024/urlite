@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import type { SiteConfig } from '../site/types';
 import { renderSiteHTML } from '../site/render';
+import { collectImageUrls, embedImages } from '../site/embed';
 
 const AVERAGE_PAGE_BYTES = 2.4 * 1024 * 1024; // httparchive median-ish, for the punchline
 
@@ -13,6 +14,7 @@ export function Share(props: {
 }) {
   const [copied, setCopied] = useState(false);
   const [credit, setCredit] = useState(true);
+  const [packing, setPacking] = useState(false);
   const [qrOk, setQrOk] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -43,10 +45,23 @@ export function Share(props: {
     }
   };
 
-  const download = () => {
+  const download = async () => {
+    if (packing) return;
+    setPacking(true);
+    /* The link can only carry photo addresses; the file has no such limit —
+       pack the photos themselves into it. Any that won't fetch (CORS) keep
+       their URL, so the export can never do worse than before. */
+    let imageData: Record<string, string> = {};
+    try {
+      imageData = await embedImages(collectImageUrls(props.config));
+    } catch {
+      /* never block the download over the photos */
+    }
+    setPacking(false);
     const html = renderSiteHTML(props.config, {
       appUrl: location.origin + '/app',
       noCredit: !credit,
+      imageData,
     });
     const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const a = document.createElement('a');
@@ -83,6 +98,8 @@ export function Share(props: {
             lighter than the average web page. Anyone who opens the link gets the full site;
             anyone who opens it in the editor can keep working on it.
             {qrOk && <> The QR code on the left contains the whole website too.</>}
+            {' '}The downloaded HTML file goes one step further: it packs the photos
+            themselves inside, so it works even offline.
           </div>
         </div>
 
@@ -90,8 +107,8 @@ export function Share(props: {
           <a className="btn btn-y" href={props.link} target="_blank" rel="noreferrer">
             Open the site
           </a>
-          <button className="btn btn-o" onClick={download}>
-            Download as HTML file
+          <button className="btn btn-o" onClick={download} disabled={packing}>
+            {packing ? 'Packing the photos…' : 'Download as HTML file'}
           </button>
           <label className="toggle" style={{ fontSize: '.86rem' }}>
             <input type="checkbox" checked={credit} onChange={(e) => setCredit(e.target.checked)} />

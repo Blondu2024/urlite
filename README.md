@@ -52,7 +52,42 @@ Content in a URL fragment is **not indexable** — search engines never see it. 
 built for sites that live in a message: demos, menus, one-pagers sent over chat or QR,
 app-store legal pages. When you want Google, use **Download HTML** and host the file on
 any static host (Netlify, Vercel, GitHub Pages — free): that copy is fully indexable.
-A hosted, indexable stub that redirects to the fragment link is another workable pattern.
+The download also packs your photos into the file as data URIs, so it works offline
+and survives expiring image links.
+
+### The SEO stub pattern
+
+If you want to keep editing through the Urlite link but still be findable, host a tiny
+**stub page**: a real, crawlable HTML file that carries your name, description and
+contact details, and sends human visitors on to the fragment link. Search engines index
+the stub; people land on the full site.
+
+Save this as `index.html`, fill in your details, and put it on any free static host:
+
+```html
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Greenline Gardens — garden care in Dublin</title>
+  <meta name="description" content="Lawns, hedges and seasonal clean-ups in Dublin. Call +353 00 000 0000.">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- humans continue to the full site; crawlers read this page -->
+  <script>location.replace("https://urlite.app/s/#v1.YOUR-LINK-HERE");</script>
+</head>
+<body>
+  <h1>Greenline Gardens</h1>
+  <p>Garden care in Dublin: lawns, hedges, seasonal clean-ups.</p>
+  <p>Phone: <a href="tel:+35300000000">+353 00 000 0000</a> ·
+     Email: <a href="mailto:hello@example.com">hello@example.com</a></p>
+  <noscript><p><a href="https://urlite.app/s/#v1.YOUR-LINK-HERE">Open the full site</a></p></noscript>
+</body>
+</html>
+```
+
+Two honest notes: the stub is what search engines rank, so put your real keywords and
+contact details in its text, not just in the redirect; and if the site stops changing,
+hosting the full downloaded HTML instead of a stub is the stronger SEO move.
 
 ## Prior art
 

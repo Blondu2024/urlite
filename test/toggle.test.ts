@@ -83,6 +83,51 @@ describe('toggle switch cascade', () => {
   });
 });
 
+describe('toggle switch outside the editor panel (Share modal)', () => {
+  // Reported 16 Aug 2026: the "Built with Urlite" toggle in the Share modal
+  // rendered as a plain checkbox — the switch rules were scoped `.f .toggle`,
+  // and the Share modal's toggle lives in `.share-actions`, not in a `.f`.
+  const SHARE_MARKUP = `
+    <div class="modal">
+      <div class="share-actions">
+        <label class="toggle">
+          <input type="checkbox" checked />
+          <span class="tk"></span>
+          <span>“Built with Urlite” line in the footer</span>
+        </label>
+      </div>
+    </div>`;
+
+  let sdom: JSDOM;
+  let sLabel: HTMLLabelElement;
+  let sInput: HTMLInputElement;
+  let sTrack: HTMLElement;
+  const scss = (el: Element) => sdom.window.getComputedStyle(el);
+
+  beforeAll(() => {
+    sdom = new JSDOM(`<!doctype html><html><head><style>${CSS}</style></head><body>${SHARE_MARKUP}</body></html>`);
+    const d = sdom.window.document;
+    sLabel = d.querySelector('label.toggle') as HTMLLabelElement;
+    sInput = d.querySelector('label.toggle input') as HTMLInputElement;
+    sTrack = d.querySelector('label.toggle .tk') as HTMLElement;
+  });
+
+  it('lays the toggle out as a flex row in the Share modal too', () => {
+    expect(scss(sLabel).display).toBe('flex');
+  });
+
+  it('keeps the track a sized 40×24 box, so it renders as a switch, not a checkbox', () => {
+    expect(scss(sTrack).display).not.toBe('inline');
+    expect(scss(sTrack).width).toBe('40px');
+    expect(scss(sTrack).height).toBe('24px');
+  });
+
+  it('anchors the hidden checkbox to its own label', () => {
+    expect(scss(sInput).position).toBe('absolute');
+    expect(scss(sLabel).position).toBe('relative');
+  });
+});
+
 describe('toggle stylesheet contract', () => {
   it('scopes the toggle rules at least as tightly as the field-label rules', () => {
     // `.f label` is (0,1,1). Every rule that styles the toggle label must match

@@ -40,6 +40,16 @@ export interface LegalSection {
   body: string;
 }
 
+export interface ShopProduct {
+  name: string;
+  /** free-typed number ("18", "4.50") — the cart sums what parses */
+  price: string;
+  desc: string;
+  image: string;
+  /** optional per-product payment link (Stripe Payment Link, PayPal.me…) — http(s) only */
+  payLink?: string;
+}
+
 export interface ContactRow {
   label: string;
   value: string;
@@ -57,7 +67,7 @@ export interface SiteConfig {
   tagline: string; // small line used in <title> / meta
   logoText?: string; // 1-2 letters for the generated favicon monogram
 
-  nav: { services: string; work: string; gallery: string; contact: string; legal?: string };
+  nav: { services: string; work: string; gallery: string; contact: string; legal?: string; shop?: string };
 
   hero: {
     image: string;
@@ -112,6 +122,25 @@ export interface SiteConfig {
 
   /** long-prose blocks (privacy policy, terms) — the app-store one-pager */
   legal: { on: boolean; headKicker: string; headTitle: string; sections: LegalSection[] };
+
+  /**
+   * The mini-shop: a catalogue with a client-side cart. Checkout is a
+   * pre-filled chat message (wa.me / mailto) or a pasted payment link —
+   * never a card form; the page stays zero-backend.
+   */
+  shop: {
+    on: boolean;
+    headKicker: string;
+    headTitle: string;
+    headLede: string;
+    /** shown after the number: "18 lei", "45 kr." */
+    currency: string;
+    /** WhatsApp number orders are sent to (free-typed; digits are extracted) */
+    whatsapp: string;
+    /** fallback order channel when there is no WhatsApp */
+    orderEmail?: string;
+    products: ShopProduct[];
+  };
 
   contact: {
     headKicker: string;

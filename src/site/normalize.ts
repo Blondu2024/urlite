@@ -1,4 +1,4 @@
-import type { BeforeAfter, ContactRow, HeroStat, LegalSection, Service, SiteConfig, Theme } from './types';
+import type { BeforeAfter, ContactRow, HeroStat, LegalSection, Service, ShopProduct, SiteConfig, Theme } from './types';
 import { PALETTES } from './palettes';
 import { ICONS } from './icons';
 import { safeColor } from './sanitize';
@@ -56,6 +56,19 @@ function legalSection(raw: unknown): LegalSection {
   return { title: S(o.title, 90), body: S(o.body, 6000) };
 }
 
+function shopProduct(raw: unknown): ShopProduct {
+  const o = O(raw);
+  const p: ShopProduct = {
+    name: S(o.name, 80),
+    price: S(o.price, 20),
+    desc: S(o.desc, 160),
+    image: S(o.image, 600),
+  };
+  const pay = S(o.payLink, 400);
+  if (pay) p.payLink = pay;
+  return p;
+}
+
 function contactRow(raw: unknown): ContactRow {
   const o = O(raw);
   const row: ContactRow = { label: S(o.label, 40), value: S(o.value, 160) };
@@ -76,6 +89,7 @@ export function normalizeConfig(raw: unknown): SiteConfig {
   const band = O(o.band);
   const gallery = O(o.gallery);
   const legal = O(o.legal);
+  const shop = O(o.shop);
   const contact = O(o.contact);
   const footer = O(o.footer);
   const nav = O(o.nav);
@@ -94,6 +108,7 @@ export function normalizeConfig(raw: unknown): SiteConfig {
       gallery: S(nav.gallery, 30),
       contact: S(nav.contact, 30),
       legal: S(nav.legal, 30) || undefined,
+      shop: S(nav.shop, 30) || undefined,
     },
     hero: {
       image: S(hero.image, 600),
@@ -151,6 +166,16 @@ export function normalizeConfig(raw: unknown): SiteConfig {
       headKicker: S(legal.headKicker, 60),
       headTitle: S(legal.headTitle, 90),
       sections: A(legal.sections, 5).map(legalSection),
+    },
+    shop: {
+      on: B(shop.on, false),
+      headKicker: S(shop.headKicker, 60),
+      headTitle: S(shop.headTitle, 90),
+      headLede: S(shop.headLede, 260),
+      currency: S(shop.currency, 12),
+      whatsapp: S(shop.whatsapp, 30),
+      orderEmail: S(shop.orderEmail, 120) || undefined,
+      products: A(shop.products, 24).map(shopProduct),
     },
     contact: {
       headKicker: S(contact.headKicker, 60),

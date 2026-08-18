@@ -22,6 +22,7 @@ export function collectImageUrls(c: SiteConfig): string[] {
     c.statement.image,
     ...c.work.items.flatMap((w) => [w.before, w.after]),
     ...c.gallery.images,
+    ...c.shop.products.map((p) => p.image),
   ];
   return [...new Set(urls.map(safeImageUrl).filter(Boolean))];
 }

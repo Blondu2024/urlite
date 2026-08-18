@@ -428,6 +428,69 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
             )}
           </Acc>
 
+          <Acc title="Shop" pill={config.shop.on ? String(config.shop.products.length) : 'off'}>
+            <Toggle label="Show the shop section" value={config.shop.on} onChange={(v) => up((d) => (d.shop.on = v))} />
+            <Text label="Kicker" value={config.shop.headKicker} onChange={(v) => up((d) => (d.shop.headKicker = v))} />
+            <Area label="Title" value={config.shop.headTitle} onChange={(v) => up((d) => (d.shop.headTitle = v))} rows={2} />
+            <Area label="Lede" value={config.shop.headLede} onChange={(v) => up((d) => (d.shop.headLede = v))} />
+            <Text
+              label="Menu label (optional)"
+              value={config.nav.shop ?? ''}
+              onChange={(v) => up((d) => (d.nav.shop = v || undefined))}
+              hint="Shown in the top menu, linking to the shop."
+            />
+            <div className="f-row">
+              <Text
+                label="WhatsApp for orders"
+                value={config.shop.whatsapp}
+                onChange={(v) => up((d) => (d.shop.whatsapp = v))}
+                hint="With country code. The cart opens as a pre-filled message to this number."
+              />
+              <Text label="Currency" value={config.shop.currency} onChange={(v) => up((d) => (d.shop.currency = v))} hint="lei, kr., €…" />
+            </div>
+            <Text
+              label="Order email (fallback)"
+              value={config.shop.orderEmail ?? ''}
+              onChange={(v) => up((d) => (d.shop.orderEmail = v || undefined))}
+              hint="Used when there is no WhatsApp number."
+            />
+            {config.shop.products.map((prod, i) => (
+              <ListItem
+                key={i}
+                n={i + 1}
+                title={prod.name}
+                onUp={i > 0 ? () => up((d) => d.shop.products.splice(i - 1, 0, d.shop.products.splice(i, 1)[0])) : undefined}
+                onDown={
+                  i < config.shop.products.length - 1
+                    ? () => up((d) => d.shop.products.splice(i + 1, 0, d.shop.products.splice(i, 1)[0]))
+                    : undefined
+                }
+                onDelete={() => up((d) => d.shop.products.splice(i, 1))}
+              >
+                <div className="f-row">
+                  <Text label="Product" value={prod.name} onChange={(v) => up((d) => (d.shop.products[i].name = v))} />
+                  <Text label="Price (just the number)" value={prod.price} onChange={(v) => up((d) => (d.shop.products[i].price = v))} />
+                </div>
+                <Area label="One line about it" value={prod.desc} onChange={(v) => up((d) => (d.shop.products[i].desc = v))} rows={2} />
+                <ImageField label="Photo" value={prod.image} onChange={(v) => up((d) => (d.shop.products[i].image = v))} />
+                <Text
+                  label="Payment link (optional)"
+                  value={prod.payLink ?? ''}
+                  onChange={(v) => up((d) => (d.shop.products[i].payLink = v || undefined))}
+                  hint="A Stripe Payment Link, PayPal.me… adds a “Buy now” button."
+                />
+              </ListItem>
+            ))}
+            {config.shop.products.length < 24 && (
+              <button
+                className="add-row"
+                onClick={() => up((d) => d.shop.products.push({ name: 'New product', price: '', desc: '', image: '' }))}
+              >
+                + Add a product
+              </button>
+            )}
+          </Acc>
+
           <Acc title="Legal pages" pill={config.legal.on ? String(config.legal.sections.length) : 'off'}>
             <Toggle label="Show the legal section" value={config.legal.on} onChange={(v) => up((d) => (d.legal.on = v))} />
             <Text label="Kicker" value={config.legal.headKicker} onChange={(v) => up((d) => (d.legal.headKicker = v))} />

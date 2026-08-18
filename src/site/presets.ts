@@ -56,6 +56,13 @@ interface CopyPack {
   legalKicker?: string;
   legalTitle?: string;
   legalSections?: [string, string][]; // [title, body]
+  /* mini-shop extras: the counter. Orders go to the preset's phone on WhatsApp. */
+  navShop?: string;
+  shopKicker?: string;
+  shopTitle?: string;
+  shopLede?: string;
+  shopCurrency?: string;
+  products?: [string, string, string][]; // [name, price, desc] — images come from images.shop
 }
 
 interface PresetImages {
@@ -63,6 +70,8 @@ interface PresetImages {
   statement: string;
   work: [string, string][]; // [before, after]
   gallery: string[];
+  /** one photo per product, same order as CopyPack.products */
+  shop?: string[];
 }
 
 export interface Preset {
@@ -98,7 +107,7 @@ function assemble(p: Preset, lang: Lang): SiteConfig {
     brandName: c.brandName,
     tagline: c.tagline,
     logoText: c.brandName.slice(0, 1),
-    nav: { services: c.nav[0], work: c.nav[1], gallery: c.nav[2], contact: c.nav[3], legal: c.navLegal },
+    nav: { services: c.nav[0], work: c.nav[1], gallery: c.nav[2], contact: c.nav[3], legal: c.navLegal, shop: c.navShop },
     hero: {
       image: p.images.hero,
       kicker: c.kicker,
@@ -154,6 +163,20 @@ function assemble(p: Preset, lang: Lang): SiteConfig {
       headKicker: c.legalKicker ?? '',
       headTitle: c.legalTitle ?? '',
       sections: (c.legalSections ?? []).map(([title, body]) => ({ title, body })),
+    },
+    shop: {
+      on: (c.products ?? []).length > 0,
+      headKicker: c.shopKicker ?? '',
+      headTitle: c.shopTitle ?? '',
+      headLede: c.shopLede ?? '',
+      currency: c.shopCurrency ?? '',
+      whatsapp: (c.products ?? []).length > 0 ? phone : '',
+      products: (c.products ?? []).map(([name, price, desc], i) => ({
+        name,
+        price,
+        desc,
+        image: p.images.shop?.[i] ?? '',
+      })),
     },
     contact: { headKicker: c.cKicker, headTitle: c.cTitle, lede: c.cLede, cta: c.cCta, rows: c.rows },
     footer: { line: c.footLine, note: c.footNote },
@@ -1721,7 +1744,249 @@ const business: Preset = {
   },
 };
 
-export const PRESETS: Preset[] = [business, garden, painter, restaurant, salon, auto, app];
+/* ================================ SHOP (bakery counter) ================================ */
+
+const shop: Preset = {
+  id: 'shop',
+  paletteId: 'espresso',
+  label: { en: 'Bakery & mini-shop', ro: 'Brutărie & mini-magazin', da: 'Bageri & minibutik' },
+  icons: ['sparkle', 'clock', 'star', 'leaf', 'shield', 'bolt'],
+  images: {
+    hero: U('1517433670267-08bbd4be890f'),
+    statement: U('1517686469429-8bdb88b9f907', 1200),
+    work: [],
+    gallery: [
+      U('1587241321921-91a834d6d191', 1200),
+      U('1608198093002-ad4e005484ec', 900),
+      U('1495474472287-4d71bcdd2085', 900),
+      U('1442512595331-e89e73853f31', 1200),
+    ],
+    shop: [
+      U('1586444248902-2f64eddc13df', 800),
+      U('1555507036-ab1f4038808a', 800),
+      U('1509440159596-0249088772ff', 800),
+      U('1578985545062-69928b1d9587', 800),
+      U('1558961363-fa8fdf82db35', 800),
+      U('1626803775151-61d756612f97', 800),
+    ],
+  },
+  ticker: true,
+  work: false,
+  band: true,
+  phone: {
+    en: ['+353 85 000 0000', '085 000 0000'],
+    ro: ['+40 700 000 000', '0700 000 000'],
+    da: ['+45 00 00 00 00', '00 00 00 00'],
+  },
+  copy: {
+    en: {
+      brandName: 'The Corner Loaf',
+      tagline: 'Neighbourhood bakery',
+      nav: ['The bakery', '', 'Inside', 'Contact'],
+      navShop: 'Order',
+      kicker: 'Real bread, baked tonight',
+      title: 'Order today, *pick up warm tomorrow.*',
+      lede: 'Sourdough, pastries and cakes from a small neighbourhood oven. Tap what you want — the order reaches us as a WhatsApp message, and it waits for you on the counter.',
+      ctaPrimary: 'Call the bakery',
+      ctaSecondary: 'See the counter',
+      stats: [
+        ['5 a.m.', 'The oven is lit every night'],
+        ['0', 'Additives, improvers, shortcuts'],
+        ['48 h', 'Every sourdough is fermented'],
+      ],
+      ticker: ['Baked fresh every morning', 'Order on WhatsApp, pick up warm', 'Cakes made to order'],
+      stBig: 'Bread the way your street remembers it.',
+      stText:
+        'Flour, water, salt and time — nothing else goes in. We bake small batches for the people who walk in, and we keep a shelf for the ones who order ahead.',
+      svcKicker: 'How it works',
+      svcTitle: 'From the counter below *to our oven door.*',
+      svcLede: 'Pick from the counter, send the order, and tell us when you are coming. That is the whole system.',
+      services: [
+        ['Pick and send', 'Add what you want to the order and send it — it lands on our WhatsApp, and we confirm right back.'],
+        ['Pick up warm', 'Tell us the hour; the bag is packed and waiting with your name on it.'],
+        ['Cakes to order', 'Birthdays and celebrations need three days — write us what you dream of.'],
+        ['For cafés & shops', 'Wholesale sourdough and pastries, delivered before you open.'],
+      ],
+      extrasLabel: 'Always on the shelf:',
+      extras: ['Espresso & filter coffee', 'Gift boxes', 'Gluten-free Fridays'],
+      workKicker: '',
+      workTitle: '',
+      workLede: '',
+      labelBefore: 'Before',
+      labelAfter: 'After',
+      workItems: [],
+      bandKicker: 'A cake to celebrate?',
+      bandTitle: 'Custom cakes need *three days’ notice.*',
+      bandText: 'Call us and describe the occasion — we bake it, you blow the candles.',
+      bandTop: 'Call the bakers',
+      bandBottom: 'Every day 7–18',
+      galKicker: 'Inside',
+      galTitle: 'The shop, most mornings',
+      shopKicker: 'The counter',
+      shopTitle: 'Tap it, *and it’s yours tomorrow.*',
+      shopLede: 'Everything below is baked to order. Send the basket as a message and pick it up warm — nothing is paid online.',
+      shopCurrency: '€',
+      products: [
+        ['Sourdough loaf', '4.50', '48-hour fermented, dark crust, 900 g.'],
+        ['Butter croissants — box of 4', '7', 'Laminated with Irish butter, baked at dawn.'],
+        ['Seeded rye', '5', 'Dense, Nordic-style, keeps a week.'],
+        ['Celebration cake', '38', 'Chocolate layers for 10–12. Three days’ notice.'],
+        ['Cookie box — dozen', '9', 'Chocolate chip, baked the same morning.'],
+        ['Chocolate tart', '24', 'Dark chocolate, pistachio, serves 8.'],
+      ],
+      cKicker: 'Find us',
+      cTitle: 'On the corner, *where the smell starts.*',
+      cLede: 'Come by, call, or just send the order — we answer between two batches.',
+      cCta: 'Call the bakery',
+      rows: [
+        { label: 'Address', value: '4 Chapel Lane, Galway', sub: 'The corner with the green door' },
+        { label: 'Hours', value: 'Mon–Sat 7–18, Sun 8–13' },
+        { label: 'Phone', value: '085 000 0000', href: 'tel:+353850000000', sub: 'WhatsApp orders too' },
+        { label: 'Email', value: 'hello@cornerloaf.ie', href: 'mailto:hello@cornerloaf.ie' },
+      ],
+      footLine: 'Baked on Chapel Lane since 2019.',
+      footNote: 'Demo website — replace every word, photo and price with your own before sending.',
+    },
+    ro: {
+      brandName: 'Cuptorul din Colț',
+      tagline: 'Brutărie de cartier',
+      nav: ['Brutăria', '', 'Înăuntru', 'Contact'],
+      navShop: 'Comandă',
+      kicker: 'Pâine adevărată, coaptă azi-noapte',
+      title: 'Comanzi azi, *ridici caldă mâine.*',
+      lede: 'Pâine cu maia, patiserie și torturi dintr-un cuptor mic de cartier. Apeși pe ce vrei — comanda ne vine ca mesaj pe WhatsApp și te așteaptă pe tejghea.',
+      ctaPrimary: 'Sună la brutărie',
+      ctaSecondary: 'Vezi tejgheaua',
+      stats: [
+        ['5:00', 'Cuptorul se aprinde în fiecare noapte'],
+        ['0', 'Aditivi, amelioratori, scurtături'],
+        ['48 h', 'Dospește fiecare pâine cu maia'],
+      ],
+      ticker: ['Coaptă proaspăt în fiecare dimineață', 'Comanzi pe WhatsApp, ridici caldă', 'Torturi la comandă'],
+      stBig: 'Pâinea așa cum o ține minte strada ta.',
+      stText:
+        'Făină, apă, sare și timp — altceva nu intră. Coacem șarje mici pentru cei care intră pe ușă și păstrăm un raft pentru cei care comandă din timp.',
+      svcKicker: 'Cum funcționează',
+      svcTitle: 'De la tejgheaua de mai jos *până la gura cuptorului.*',
+      svcLede: 'Alegi de pe tejghea, trimiți comanda și ne spui când vii. Ăsta e tot sistemul.',
+      services: [
+        ['Alegi și trimiți', 'Adaugi ce vrei în comandă și o trimiți — ne pică pe WhatsApp și îți confirmăm imediat.'],
+        ['Ridici caldă', 'Ne spui ora; punga e pregătită și te așteaptă cu numele tău pe ea.'],
+        ['Torturi la comandă', 'Aniversările au nevoie de trei zile — scrie-ne ce visezi.'],
+        ['Pentru cafenele & magazine', 'Pâine cu maia și patiserie en-gros, livrate înainte să deschizi.'],
+      ],
+      extrasLabel: 'Mereu pe raft:',
+      extras: ['Espresso & cafea la filtru', 'Cutii cadou', 'Vinerea fără gluten'],
+      workKicker: '',
+      workTitle: '',
+      workLede: '',
+      labelBefore: 'Înainte',
+      labelAfter: 'După',
+      workItems: [],
+      bandKicker: 'Un tort de sărbătoare?',
+      bandTitle: 'Torturile la comandă cer *trei zile înainte.*',
+      bandText: 'Sună-ne și descrie ocazia — noi îl coacem, tu sufli în lumânări.',
+      bandTop: 'Sună brutarii',
+      bandBottom: 'Zilnic 7–18',
+      galKicker: 'Înăuntru',
+      galTitle: 'Magazinul, în majoritatea dimineților',
+      shopKicker: 'Tejgheaua',
+      shopTitle: 'Apeși, *și mâine e a ta.*',
+      shopLede: 'Tot ce e mai jos se coace la comandă. Trimiți coșul ca mesaj și ridici cald — nu se plătește nimic online.',
+      shopCurrency: 'lei',
+      products: [
+        ['Pâine cu maia', '18', 'Dospită 48 de ore, coajă închisă, 900 g.'],
+        ['Croissante cu unt — cutie de 4', '28', 'Foietaj cu unt adevărat, coapte în zori.'],
+        ['Pâine de secară cu semințe', '20', 'Densă, în stil nordic, ține o săptămână.'],
+        ['Tort de sărbătoare', '220', 'Straturi de ciocolată pentru 10–12. Trei zile înainte.'],
+        ['Cutie de fursecuri — 12', '35', 'Cu ciocolată, coapte în aceeași dimineață.'],
+        ['Tartă de ciocolată', '130', 'Ciocolată neagră, fistic, pentru 8.'],
+      ],
+      cKicker: 'Ne găsești',
+      cTitle: 'Pe colț, *unde începe mirosul.*',
+      cLede: 'Treci pe la noi, sună sau trimite direct comanda — răspundem între două șarje.',
+      cCta: 'Sună la brutărie',
+      rows: [
+        { label: 'Adresa', value: 'Str. Bisericii 4, Galați', sub: 'Colțul cu ușa verde' },
+        { label: 'Program', value: 'Lun–Sâm 7–18, Dum 8–13' },
+        { label: 'Telefon', value: '0700 000 000', href: 'tel:+40700000000', sub: 'Și comenzi pe WhatsApp' },
+        { label: 'Email', value: 'salut@cuptoruldincolt.ro', href: 'mailto:salut@cuptoruldincolt.ro' },
+      ],
+      footLine: 'Coacem pe Strada Bisericii din 2019.',
+      footNote: 'Site demonstrativ — înlocuiește fiecare cuvânt, poză și preț cu ale tale înainte să-l trimiți.',
+    },
+    da: {
+      brandName: 'Hjørnebageriet',
+      tagline: 'Kvarterets bageri',
+      nav: ['Bageriet', '', 'Indenfor', 'Kontakt'],
+      navShop: 'Bestil',
+      kicker: 'Rigtigt brød, bagt i nat',
+      title: 'Bestil i dag, *hent det varmt i morgen.*',
+      lede: 'Surdej, wienerbrød og kager fra en lille kvartersovn. Tryk på det, du vil have — bestillingen lander hos os som en WhatsApp-besked og venter på disken.',
+      ctaPrimary: 'Ring til bageriet',
+      ctaSecondary: 'Se disken',
+      stats: [
+        ['5.00', 'Ovnen tændes hver nat'],
+        ['0', 'Tilsætningsstoffer og genveje'],
+        ['48 t', 'Hver surdej hæver langsomt'],
+      ],
+      ticker: ['Friskbagt hver morgen', 'Bestil på WhatsApp, hent varmt', 'Kager på bestilling'],
+      stBig: 'Brød, som din gade husker det.',
+      stText:
+        'Mel, vand, salt og tid — andet kommer ikke i. Vi bager små portioner til dem, der kommer ind ad døren, og holder en hylde til dem, der bestiller i forvejen.',
+      svcKicker: 'Sådan fungerer det',
+      svcTitle: 'Fra disken herunder *til ovnlågen.*',
+      svcLede: 'Vælg fra disken, send bestillingen, og sig hvornår du kommer. Det er hele systemet.',
+      services: [
+        ['Vælg og send', 'Læg det, du vil have, i bestillingen og send den — den lander på vores WhatsApp, og vi bekræfter med det samme.'],
+        ['Hent det varmt', 'Sig et tidspunkt; posen står pakket med dit navn på.'],
+        ['Kager på bestilling', 'Fødselsdage kræver tre dages varsel — skriv, hvad du drømmer om.'],
+        ['Til caféer & butikker', 'Surdejsbrød og wienerbrød en gros, leveret før du åbner.'],
+      ],
+      extrasLabel: 'Altid på hylden:',
+      extras: ['Espresso & filterkaffe', 'Gaveæsker', 'Glutenfri fredage'],
+      workKicker: '',
+      workTitle: '',
+      workLede: '',
+      labelBefore: 'Før',
+      labelAfter: 'Efter',
+      workItems: [],
+      bandKicker: 'En kage til festen?',
+      bandTitle: 'Bestillingskager kræver *tre dages varsel.*',
+      bandText: 'Ring og beskriv anledningen — vi bager den, du puster lysene ud.',
+      bandTop: 'Ring til bagerne',
+      bandBottom: 'Alle dage 7–18',
+      galKicker: 'Indenfor',
+      galTitle: 'Butikken, de fleste morgener',
+      shopKicker: 'Disken',
+      shopTitle: 'Tryk på det, *så er det dit i morgen.*',
+      shopLede: 'Alt herunder bages på bestilling. Send kurven som en besked og hent det varmt — der betales ikke noget online.',
+      shopCurrency: 'kr.',
+      products: [
+        ['Surdejsbrød', '45', '48 timers hævning, mørk skorpe, 900 g.'],
+        ['Smørcroissanter — æske med 4', '60', 'Lamineret med rigtigt smør, bagt ved daggry.'],
+        ['Rugbrød med kerner', '50', 'Tæt, nordisk, holder en uge.'],
+        ['Festkage', '380', 'Chokoladelag til 10–12. Tre dages varsel.'],
+        ['Småkageæske — 12 stk.', '75', 'Med chokolade, bagt samme morgen.'],
+        ['Chokoladetærte', '240', 'Mørk chokolade, pistacie, til 8.'],
+      ],
+      cKicker: 'Find os',
+      cTitle: 'På hjørnet, *hvor duften begynder.*',
+      cLede: 'Kig forbi, ring, eller send bare bestillingen — vi svarer mellem to bagninger.',
+      cCta: 'Ring til bageriet',
+      rows: [
+        { label: 'Adresse', value: 'Kirkegade 4, Kalundborg', sub: 'Hjørnet med den grønne dør' },
+        { label: 'Åbningstider', value: 'Man–lør 7–18, søn 8–13' },
+        { label: 'Telefon', value: '00 00 00 00', href: 'tel:+4500000000', sub: 'Også WhatsApp-bestillinger' },
+        { label: 'E-mail', value: 'hej@hjornebageriet.dk', href: 'mailto:hej@hjornebageriet.dk' },
+      ],
+      footLine: 'Har bagt på Kirkegade siden 2019.',
+      footNote: 'Demoside — udskift hvert ord, foto og pris med dine egne, før du sender den.',
+    },
+  },
+};
+
+export const PRESETS: Preset[] = [business, garden, painter, restaurant, shop, salon, auto, app];
 
 export function buildPreset(presetId: string, lang: Lang): SiteConfig {
   const p = PRESETS.find((x) => x.id === presetId) ?? PRESETS[0];

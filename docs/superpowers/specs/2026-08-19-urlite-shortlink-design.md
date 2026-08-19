@@ -105,8 +105,10 @@ At ~4 KB a site, the free tier holds tens of thousands of links.
 One function file, `api/link.ts`, self-contained. Relative imports into `../src`
 fail at runtime on Vercel's builder (see the note in `api/fetch-site.ts`), so
 the pure helpers live in that same file and are exported by name; the tests
-import them from there, Vercel imports the default handler. No cross-file
-runtime import is introduced.
+import them from there, while Vercel picks up the `GET` and `POST` exports, the
+signature `api/rewrite.ts` already uses. No cross-file runtime import is
+introduced. `tsconfig.json` already has `api` in `include`, so the tests
+typecheck against it.
 
 The store is an injected interface, `{ get(key), set(key, value) }`. The default
 handler builds an Upstash-backed one from the environment; tests pass a
@@ -117,7 +119,16 @@ Map-backed one. That is what makes the handler testable without network.
 **Update** — `POST /api/link` with `{ id, secret, payload }` → `{ ok: true }`
 Wrong or missing secret answers `403`. Unknown id answers `404`.
 
-**Resolve** — `GET /x/:id` (rewritten to `api/x.ts`) → `302` to
+**Read** — `GET /api/link?id=<id>` → `{ payload }`. No secret required: the
+payload is public already, since anyone holding the short link can follow the
+redirect and read it. This is what a management link opens with, and it is why
+that link does not have to carry a copy of the site — a copy would be frozen at
+creation time, which is the bug this feature exists to fix.
+
+**Resolve** — `GET /x/:id`, rewritten to the same function as
+`/api/link?id=:id&go=1` so there is one store implementation rather than two
+(Vercel's builder makes cross-file imports inside `api/` unreliable, so a
+second function file would mean copying the store) → `302` to
 `/s/#<payload>` on the same host, `Cache-Control: no-store` so an update is
 visible on the next scan. An unknown id redirects to `/s/` with no fragment,
 which lands on the viewer's existing "this link doesn't seem to have a website
@@ -149,11 +160,17 @@ After creation it shows the short link, the QR code regenerated from it (which
 now always fits), and the management link, with the warning that this one is
 the key to the site.
 
-**Editor.** Opened as `/app#m=<id>.<secret>`, it loads the site and shows a bar
-saying this site has a printed link, with an `Update the printed link` button.
-The pair is also kept in `localStorage` so the same device does not need the
-management link, but the link is presented as the thing to save, because
-`localStorage` does not travel between devices.
+**Editor.** Opened as `/app#m=<id>.<secret>`, it reads the pair out of the hash,
+fetches the current payload, decodes it through the existing `decodeSite` and
+`normalizeConfig`, and shows a bar saying this site has a printed link, with an
+`Update the printed link` button.
+
+The pair is then kept in React state and in `localStorage` (`urlite-manage`,
+alongside the existing `urlite-draft`), so the editor's usual
+`history.replaceState('/app#' + encoded)` can keep working untouched and the
+draft keeps living in the address bar as it does today. The management link is
+still what the user is told to save, because `localStorage` does not travel
+between devices. `Start over` clears `urlite-manage` together with the draft.
 
 **Copy.** The modal currently reads "No server, no database, no account." That
 sentence becomes false for anyone who takes a short link. It is rewritten so it
@@ -172,7 +189,10 @@ TDD, `vitest`, no network.
 - payload refused when it is not deflate-decodable, not JSON, not a config
   shape, or over the size cap
 - rate limit trips at the configured number of requests
+- read: returns the stored payload for a known id, 404 for an unknown one
 - resolve: 302 with the fragment, `no-store`, and the short host preserved
+- the management hash `#m=<id>.<secret>` parses, and anything malformed is
+  ignored rather than throwing
 - an identity test that `src/site/codec.ts` and the rendered viewer output are
   unchanged byte-for-byte, in the manner of `test/export-embed.test.ts`
 

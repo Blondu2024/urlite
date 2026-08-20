@@ -22,7 +22,11 @@
   ],
   "rewrites": [
     { "source": "/app", "destination": "/" },
-    { "source": "/x/:id", "destination": "/api/link?id=:id&go=1" }
+    {
+      "source": "/x/:id",
+      "has": [{ "type": "host", "value": "urlite-x.vercel.app" }],
+      "destination": "/api/link?id=:id&go=1"
+    }
   ],
   "headers": [
     {

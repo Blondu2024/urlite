@@ -25,23 +25,48 @@ const DRAFT_KEY = 'urlite-draft';
     else's site and must never inherit it (see manageKeyFor). */
 export type ConfigSource = 'hash' | 'draft' | null;
 
-function initialConfig(): { config: SiteConfig | null; source: ConfigSource } {
+function initialConfig(): {
+  config: SiteConfig | null;
+  source: ConfigSource;
+  /** the exact bytes the hash carried, for the byte-identity check below */
+  payload: string | null;
+} {
   /* a management hash (#m=id.secret) never decodes as a site payload, so
      without this guard the very first render would fall through to
      whatever old draft happens to be sitting in storage, an unrelated site
      rendered under a bar that claims a printed link points at it. The
      mount effect resolves the real, current payload; until then this must
      stay empty rather than guess. */
-  if (parseManageHash(location.hash)) return { config: null, source: null };
+  if (parseManageHash(location.hash)) return { config: null, source: null, payload: null };
   const fromHash = decodeSite(location.hash);
-  if (fromHash !== null) return { config: normalizeConfig(fromHash), source: 'hash' };
+  if (fromHash !== null) {
+    /* same trim and strip decodeSite just did, so this is comparable to
+       what encodeSite produces */
+    const payload = location.hash.trim().replace(/^#/, '');
+    return { config: normalizeConfig(fromHash), source: 'hash', payload };
+  }
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
-    if (raw) return { config: normalizeConfig(JSON.parse(raw)), source: 'draft' };
+    if (raw) return { config: normalizeConfig(JSON.parse(raw)), source: 'draft', payload: null };
   } catch {
     /* corrupted draft, start fresh */
   }
-  return { config: null, source: null };
+  return { config: null, source: null, payload: null };
+}
+
+/** The stored draft as the bytes the address bar would carry for it, or null
+    when there is no draft or it cannot be read. encodeSite is deterministic
+    from JSON.stringify, and the draft was written with JSON.stringify of the
+    very config the hash was encoded from, so a reload of your own editor URL
+    produces the identical string. */
+function encodedDraft(): string | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? encodeSite(JSON.parse(raw) as SiteConfig) : null;
+  } catch {
+    /* no draft, corrupt draft, blocked storage: all "cannot prove it matches" */
+    return null;
+  }
 }
 
 /** The single home for the door-two rule: a stored management key is only
@@ -73,9 +98,25 @@ export function manageKeyFor(source: ConfigSource, stored: ManageKey | null): Ma
  * The moment a foreign config is allowed to overwrite the draft, the stored
  * key demonstrably no longer belongs to the draft, so it has to go from
  * storage, not merely be withheld from this render.
+ *
+ * WHY YOUR OWN RELOAD IS EXEMPT, and this is not a hole in the above. The
+ * debounce writes DRAFT_KEY and the address-bar hash from the same config in
+ * the same tick, so pressing F5 while editing your own printed site boots
+ * from a v1. hash whose bytes are identical to the encoded draft. Forgetting
+ * the key there would mean "press F5, lose the only local copy of the key to
+ * your printed link", in a feature whose whole promise is that a printed code
+ * keeps working. A foreign site never matches those bytes, so step 2 above is
+ * still caught. And if the draft write failed, on full or blocked storage,
+ * the two differ and the key is forgotten, which is the safe direction.
  */
-export function shouldForgetStoredKey(source: ConfigSource): boolean {
-  return source === 'hash';
+export function shouldForgetStoredKey(
+  source: ConfigSource,
+  hashPayload: string | null,
+  draftPayload: string | null,
+): boolean {
+  if (source !== 'hash') return false;
+  if (hashPayload === null || draftPayload === null) return true;
+  return hashPayload !== draftPayload;
 }
 
 function Logo({ onClick }: { onClick: () => void }) {
@@ -221,13 +262,16 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
   const encoded = useMemo(() => (config ? encodeSite(config) : ''), [config]);
   const viewUrl = encoded ? `${location.origin}/s/#${encoded}` : '';
 
-  /* Door three (see shouldForgetStoredKey): this config came from somebody
-     else's link and the debounce below is about to write it into the draft,
-     so the stored key stops belonging to the draft right here. Removing this
-     re-opens the three-step sequence documented above. */
+  /* Door three (see shouldForgetStoredKey): a config from a hash that is not
+     byte-identical to the stored draft came from somebody else's link, and
+     the debounce below is about to write it into the draft, so the stored
+     key stops belonging to the draft right here. Reading the draft now is
+     safe: effects run at mount, a quarter of a second before the first
+     debounce tick could replace it. Removing this re-opens the three-step
+     sequence documented above. */
   useEffect(() => {
-    if (shouldForgetStoredKey(boot.source)) clearManageKey();
-  }, [boot.source]);
+    if (shouldForgetStoredKey(boot.source, boot.payload, encodedDraft())) clearManageKey();
+  }, [boot.source, boot.payload]);
 
   /* a management link opens the live version of a printed site, not the copy
      that link was made from, because that copy would be frozen at creation

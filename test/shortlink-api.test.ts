@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { handlePost, handleGet, keyOf, type Store, POST, GET, ALLOWED_ORIGIN, limited, cannotServeResponse } from '../api/link';
 import { buildPreset } from '../src/site/presets';
 import { encodeSite } from '../src/site/codec';
@@ -214,6 +216,41 @@ describe('guards', () => {
     expect(limited('r:' + ip2, 30)).toBe(true); // read limit hit
     // Write quota for same IP is still available
     expect(limited('w:' + ip2, 4)).toBe(false);
+  });
+});
+
+/**
+ * Host isolation, read off the routing table itself. Nothing legitimate ever
+ * produces urlite.app/x/<id>: the API names only the short host and the share
+ * dialog shows only that. A brand-host redirect would hand an abuser a
+ * urlite.app URL that resolves to their page, so every abuse report would
+ * then name the brand, which is the one thing this split exists to prevent.
+ */
+describe('routing: /x/ on the brand host', () => {
+  const conf = JSON.parse(readFileSync(resolve(__dirname, '../vercel.json'), 'utf8')) as {
+    redirects: { source: string; has?: { type: string; value: string }[]; destination: string }[];
+    rewrites: { source: string; has?: { type: string; value: string }[]; destination: string }[];
+  };
+
+  it('is not redirected to the short host, it simply is not a route', () => {
+    const brandX = conf.redirects.filter(
+      (r) => r.source.startsWith('/x/') && r.has?.some((h) => h.value === 'urlite.app'),
+    );
+    expect(brandX).toEqual([]);
+  });
+
+  it('resolves only on the short host, and only there', () => {
+    const rewrites = conf.rewrites.filter((r) => r.source.startsWith('/x/'));
+    expect(rewrites).toHaveLength(1);
+    expect(rewrites[0].has).toEqual([{ type: 'host', value: 'urlite-x.vercel.app' }]);
+  });
+
+  it('still sends somebody who lands on the short host home to the brand', () => {
+    const home = conf.redirects.filter((r) =>
+      r.has?.some((h) => h.type === 'host' && h.value === 'urlite-x.vercel.app'),
+    );
+    expect(home.map((r) => r.source).sort()).toEqual(['/', '/app']);
+    for (const r of home) expect(r.destination).toContain('https://urlite.app');
   });
 });
 

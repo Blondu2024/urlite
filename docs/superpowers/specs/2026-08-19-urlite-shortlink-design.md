@@ -1,7 +1,7 @@
 # Design: stable short links (printable QR codes)
 
 Date: 2026-08-19
-Status: approved for planning
+Status: implemented on branch feat/short-links, awaiting deployment and production verification
 
 ## The problem
 

@@ -89,6 +89,28 @@ Two honest notes: the stub is what search engines rank, so put your real keyword
 contact details in its text, not just in the redirect; and if the site stops changing,
 hosting the full downloaded HTML instead of a stub is the stronger SEO move.
 
+## Short links, if you need one on a van
+
+The link a site lives in grows with the site, and past roughly 2.9 KB it stops
+fitting in a QR code. The `app` and `shop` templates are both past that, which
+made the two templates aimed at businesses the two you could not print.
+
+So there is one optional exception to "no backend". Press "Make a short link I
+can print" in the share dialog and you get `urlite-x.vercel.app/x/<id>`, which
+answers a redirect into the ordinary viewer. Two things are stored against that
+id: the same encoded site your long link already carries, and a SHA-256 of the
+key you are given. Nothing else. No account, no email, no analytics, no cookie.
+
+The key is a second link. Keep it. It is the only way to change what an already
+printed code shows, and nobody can recover it for you.
+
+Short links are served from a different host than urlite.app on purpose, so
+pages made by strangers never render on the domain the editor lives on.
+
+If you do not press that button, nothing changes. Your link is still the whole
+site, still needs nothing from anybody, and still works if this project
+disappears tomorrow.
+
 ## Prior art
 
 After building Urlite we learned of [itty.bitty](https://github.com/alcor/itty.bitty),

@@ -1,7 +1,21 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { handlePost, handleGet, keyOf, type Store, POST, GET, ALLOWED_ORIGIN, limited, cannotServeResponse } from '../api/link';
+import {
+  handlePost,
+  handleGet,
+  keyOf,
+  type Store,
+  POST,
+  GET,
+  ALLOWED_ORIGIN,
+  ID_ATTEMPTS,
+  SWEEP_ABOVE,
+  limited,
+  rateLimitBuckets,
+  cannotServeResponse,
+  validPayload,
+} from '../api/link';
 import { buildPreset } from '../src/site/presets';
 import { encodeSite } from '../src/site/codec';
 
@@ -73,6 +87,92 @@ describe('create', () => {
     const store = memoryStore();
     const out = await body(await handlePost({ payload: payloadA }, store, 1000));
     expect(out.url).toBe(`https://urlite-x.vercel.app/x/${out.id}`);
+  });
+
+  /**
+   * A repeated id would overwrite the record and its secretHash together,
+   * handing somebody's printed site to whoever collided with them, with no
+   * way to notice and no way back. Vanishingly unlikely, totally
+   * unrecoverable, so it is checked rather than assumed.
+   */
+  describe('when the id it picked is already taken', () => {
+    /** a store where the first `taken` ids offered already exist */
+    function collidingStore(taken: number): Store & { map: Map<string, string>; seen: string[] } {
+      const inner = memoryStore();
+      const seen: string[] = [];
+      return {
+        map: inner.map,
+        seen,
+        async get(k) {
+          seen.push(k);
+          if (seen.length <= taken) return JSON.stringify({ payload: 'someone else' });
+          return inner.get(k);
+        },
+        set: inner.set,
+      };
+    }
+
+    it('picks another rather than overwriting the record that is there', async () => {
+      const store = collidingStore(2);
+      const out = await body(await handlePost({ payload: payloadA }, store, 1000));
+      expect(out.ok).toBe(true);
+      expect(store.seen).toHaveLength(3); // two taken, then a free one
+      /* the two it walked away from are untouched */
+      expect(store.map.size).toBe(1);
+      expect(store.map.get(keyOf(out.id as string))).toContain(payloadA);
+    });
+
+    it('gives up loudly instead of writing over somebody', async () => {
+      const store = collidingStore(Number.MAX_SAFE_INTEGER);
+      const res = await handlePost({ payload: payloadA }, store, 1000);
+      expect(res.status).toBe(503);
+      expect(store.seen).toHaveLength(ID_ATTEMPTS);
+      expect(store.map.size).toBe(0);
+    });
+  });
+});
+
+/**
+ * atob implements forgiving-base64: it strips ASCII whitespace. A payload
+ * carrying two CRLFs is four characters longer, which leaves the base64
+ * length alignment intact, so it inflated cleanly and passed. It was
+ * harmless only because undici rejected the location header it ended up in
+ * and a catch turned that into a safe 302. Refuse the shape instead.
+ */
+describe('what counts as a payload', () => {
+  const half = Math.floor(payloadA.length / 2);
+  /* two CRLFs, not one: four characters keep the length modulo 4, which is
+     exactly what let this through the old check */
+  const smuggled = payloadA.slice(0, half) + '\r\n\r\n' + payloadA.slice(half);
+
+  it('accepts a site the editor actually made', () => {
+    expect(validPayload(payloadA)).toBe(true);
+  });
+
+  it('refuses a payload with CRLFs hidden inside it', () => {
+    expect(validPayload(smuggled)).toBe(false);
+  });
+
+  it('refuses stray whitespace of every kind atob would have forgiven', () => {
+    for (const ws of ['\r\n\r\n', '\t\t\t\t', '    ', '\f\f\f\f']) {
+      expect(validPayload(payloadA + ws)).toBe(false);
+      expect(validPayload('v1.' + ws + payloadA.slice(3))).toBe(false);
+    }
+  });
+
+  it('refuses anything that is not v1. base64url from end to end', () => {
+    expect(validPayload('v2.' + payloadA.slice(3))).toBe(false);
+    expect(validPayload(payloadA.slice(3))).toBe(false);
+    expect(validPayload('v1.')).toBe(false);
+    expect(validPayload('v1.abc=def')).toBe(false);
+    expect(validPayload('v1.abc/def')).toBe(false);
+    expect(validPayload(42)).toBe(false);
+  });
+
+  it('will not store one either, through the ordinary public path', async () => {
+    const store = memoryStore();
+    expect((await handlePost({ payload: smuggled }, store, 1000)).status).toBe(422);
+    expect(store.map.size).toBe(0);
   });
 });
 
@@ -363,5 +463,48 @@ describe('a rate-limited GET', () => {
     const res = await flood('203.0.113.8', false);
     expect(res.status).toBe(429);
     expect((await body(res)).error).toBe('slow down');
+  });
+});
+
+/**
+ * Last in the file on purpose: the sweep is global, so it clears buckets the
+ * tests above are done with. The exposure here is not the same as in
+ * api/rewrite.ts, which this limiter was copied from: that one is Origin
+ * gated, this GET is public and /x/:id rewrites into it, so every scanner on
+ * the internet would otherwise leave a key behind for the life of the warm
+ * instance.
+ */
+describe('the rate limiter does not grow forever', () => {
+  it('drops the addresses that went quiet', () => {
+    const base = Date.now();
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(base);
+      for (let i = 0; i < SWEEP_ABOVE + 8; i++) limited('sweep-' + i, 30);
+      expect(rateLimitBuckets()).toBeGreaterThan(SWEEP_ABOVE);
+
+      /* a minute later every one of those windows is empty */
+      vi.setSystemTime(base + 61_000);
+      limited('sweep-after', 30);
+      expect(rateLimitBuckets()).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the addresses that are still knocking', () => {
+    const base = Date.now();
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(base);
+      for (let i = 0; i < SWEEP_ABOVE + 8; i++) limited('busy-' + i, 30);
+      vi.setSystemTime(base + 30_000); // still inside the window
+      limited('busy-again', 30);
+      expect(rateLimitBuckets()).toBeGreaterThan(SWEEP_ABOVE);
+      /* and the counting is unharmed */
+      expect(limited('busy-0', 1)).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

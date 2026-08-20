@@ -12,6 +12,8 @@ import { inflateSync, strFromU8 } from 'fflate';
 
 export const ID_ALPHABET = '23456789abcdefghjkmnpqrstuvwxyz'; // no 0, o, 1, l, i
 const ID_LENGTH = 10;
+/** tries at a free id before giving up rather than overwriting somebody */
+export const ID_ATTEMPTS = 5;
 export const MAX_PAYLOAD = 65536;
 
 export function newId(): string {
@@ -66,15 +68,23 @@ export async function sameSecret(hash: string, candidate: string): Promise<boole
   return diff === 0;
 }
 
+/* The whole payload, not just its first three characters. atob implements
+   forgiving-base64 and strips ASCII whitespace, so a payload carrying two
+   CRLFs (four characters, which leaves the base64 length alignment intact)
+   inflates cleanly, used to pass here, and would be stored and later handed
+   to a location header. Refusing the shape outright makes that safe by
+   construction instead of by what the runtime happens to reject. */
+const PAYLOAD_SHAPE = /^v1\.[A-Za-z0-9_-]+$/;
+
 /**
  * The important guard. Anything we store must be a site the editor could have
- * made — that is what keeps this from being free storage for arbitrary text,
- * which is the actual phishing vector.
+ * made, and nothing else: that is what keeps this from being free storage for
+ * arbitrary text, which is the actual phishing vector.
  */
 export function validPayload(v: unknown): v is string {
   if (typeof v !== 'string') return false;
-  if (!v.startsWith('v1.')) return false;
   if (v.length > MAX_PAYLOAD) return false;
+  if (!PAYLOAD_SHAPE.test(v)) return false;
   try {
     const cfg = JSON.parse(strFromU8(inflateSync(fromBase64Url(v.slice(3))))) as Record<
       string,
@@ -152,7 +162,19 @@ export async function handlePost(
   if (b.id === undefined && b.secret === undefined) {
     if (b.payload === undefined) return json(400, { ok: false, error: 'bad request' });
     if (!validPayload(b.payload)) return json(422, { ok: false, error: 'not a site' });
-    const id = newId();
+    /* An id we picked twice would overwrite the record AND its secretHash,
+       silently transferring somebody's printed site to whoever collided
+       with them, undetectably and with no way back. Astronomically
+       unlikely at 10 characters from 31 letters, total if it happens. */
+    let id = '';
+    for (let attempt = 0; attempt < ID_ATTEMPTS; attempt++) {
+      const candidate = newId();
+      if ((await store.get(keyOf(candidate))) === null) {
+        id = candidate;
+        break;
+      }
+    }
+    if (!id) return json(503, { ok: false, error: 'could not pick a free link' });
     const secret = newSecret();
     const rec: LinkRecord = {
       payload: b.payload,
@@ -210,12 +232,31 @@ const WRITE_LIMIT = 4; // per IP per minute, per warm instance
 const READ_LIMIT = 30;
 
 const hits = new Map<string, number[]>();
+/** sweep only once the map is big enough for the walk to be worth it */
+export const SWEEP_ABOVE = 64;
+
+/** how many addresses are being remembered right now, so the sweep above is
+    provable rather than merely written down */
+export function rateLimitBuckets(): number {
+  return hits.size;
+}
 
 export function limited(key: string, max: number): boolean {
   const now = Date.now();
   const w = (hits.get(key) ?? []).filter((t) => now - t < 60_000);
   w.push(now);
   hits.set(key, w);
+
+  /* This GET is public, unlike the Origin-gated one in api/rewrite.ts, so
+     every scanner on the internet would otherwise leave a key behind for
+     the life of the warm instance. Sweep the buckets that went quiet. */
+  if (hits.size > SWEEP_ABOVE) {
+    for (const [k, times] of hits) {
+      if (k !== key && (times.length === 0 || now - times[times.length - 1] >= 60_000)) {
+        hits.delete(k);
+      }
+    }
+  }
   return w.length > max;
 }
 

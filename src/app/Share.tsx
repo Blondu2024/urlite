@@ -3,7 +3,14 @@ import QRCode from 'qrcode';
 import type { SiteConfig } from '../site/types';
 import { renderSiteHTML } from '../site/render';
 import { collectImageUrls, embedImages } from '../site/embed';
-import { createShortLink, manageUrl, shortLinkUrl, type ManageKey } from './shortlink';
+import {
+  createShortLink,
+  manageUrl,
+  shortLinkErrorMessage,
+  shortLinkUrl,
+  ShortLinkError,
+  type ManageKey,
+} from './shortlink';
 
 const AVERAGE_PAGE_BYTES = 2.4 * 1024 * 1024; // httparchive median-ish, for the punchline
 
@@ -171,8 +178,12 @@ export function Share(props: {
                     const made = await createShortLink(props.link.split('#')[1] ?? '');
                     setShortUrl(made.url);
                     props.onManage(made.key);
-                  } catch {
-                    setShortErr('Could not make a short link just now. Try again in a minute.');
+                  } catch (e) {
+                    /* saying "try again in a minute" to somebody whose answer
+                       is 503 would be a lie every minute forever */
+                    setShortErr(
+                      shortLinkErrorMessage(e instanceof ShortLinkError ? e.status : -1),
+                    );
                   } finally {
                     setMaking(false);
                   }

@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { SHORT_HOST, manageUrl, parseManageHash, shortLinkUrl } from '../src/app/shortlink';
+import {
+  SHORT_HOST,
+  manageUrl,
+  parseManageHash,
+  shortLinkErrorMessage,
+  shortLinkUrl,
+} from '../src/app/shortlink';
 
 /**
  * The management link is the only key to a printed site, so parsing it has to
@@ -69,5 +75,41 @@ describe('manageUrl', () => {
     const key = { id: 'a7fq2m9k3p', secret: 'AbCdEfGhIjKlMnOpQrStUv' };
     const url = manageUrl(key, 'https://urlite.app');
     expect(parseManageHash(url.slice(url.indexOf('#')))).toEqual(key);
+  });
+});
+
+/**
+ * One generic message for every failure meant that before the environment
+ * variables exist, every single press of the button told the person to try
+ * again in a minute, forever, which was never going to become true.
+ */
+describe('shortLinkErrorMessage', () => {
+  it('says short links are simply not available here on a 503', () => {
+    const m = shortLinkErrorMessage(503);
+    expect(m.toLowerCase()).toContain('not switched on');
+    expect(m.toLowerCase()).not.toContain('try again in a minute');
+  });
+
+  it('says wait a minute only when waiting a minute is the answer', () => {
+    expect(shortLinkErrorMessage(429).toLowerCase()).toContain('wait a minute');
+  });
+
+  it('says the connection failed when the request never landed', () => {
+    expect(shortLinkErrorMessage(0).toLowerCase()).toContain('connection');
+  });
+
+  it('has something honest for anything else', () => {
+    for (const status of [400, 403, 422, 500, -1]) {
+      const m = shortLinkErrorMessage(status);
+      expect(m.length).toBeGreaterThan(0);
+      expect(m).not.toContain('—');
+      /* whatever went wrong, the long link is still the whole site */
+      expect(m.toLowerCase()).toContain('long link');
+    }
+  });
+
+  it('never promises a wait that will not help', () => {
+    const stuck = [503, 422].map(shortLinkErrorMessage);
+    for (const m of stuck) expect(m.toLowerCase()).not.toContain('wait a minute');
   });
 });

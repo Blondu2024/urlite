@@ -70,14 +70,54 @@ export function clearManageKey(): void {
   }
 }
 
+/** carries the status, because "why" changes what we can honestly tell somebody */
+export class ShortLinkError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'ShortLinkError';
+  }
+}
+
+/**
+ * What to put on screen when the button fails. Before the environment
+ * variables exist every press answers 503, and telling that person to "try
+ * again in a minute" would be a lie every minute forever.
+ */
+export function shortLinkErrorMessage(status: number): string {
+  if (status === 503) {
+    return 'Short links are not switched on here yet, so this button cannot make one. The long link above still works and still holds the whole site.';
+  }
+  if (status === 429) {
+    return 'That is a lot of short links at once. Wait a minute, then press it again.';
+  }
+  if (status === 422) {
+    return 'This site could not be read back as a site, so it was not stored. The long link above still works.';
+  }
+  if (status === 0) {
+    return 'Could not reach the server. Check your connection, then press it again.';
+  }
+  return 'Something went wrong making the short link. The long link above still works, and you can press it again.';
+}
+
 async function post(body: unknown): Promise<Record<string, unknown>> {
-  const res = await fetch('/api/link', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch('/api/link', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    /* status 0: never reached the server at all */
+    throw new ShortLinkError(0, 'network');
+  }
   const out = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!res.ok || out.ok !== true) throw new Error(String(out.error ?? res.status));
+  if (!res.ok || out.ok !== true) {
+    throw new ShortLinkError(res.status, String(out.error ?? res.status));
+  }
   return out;
 }
 

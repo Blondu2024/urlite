@@ -223,10 +223,22 @@ function clientIp(request: Request): string {
   return (request.headers.get('x-forwarded-for') ?? 'unknown').split(',')[0].trim();
 }
 
-export function storeUnavailableResponse(go: boolean, status: number = 503): Response {
+const CANNOT_SERVE_ERROR: Record<number, string> = {
+  429: 'slow down',
+  502: 'store unavailable',
+  503: 'short links unavailable',
+};
+
+/**
+ * Every way this endpoint can decline. Named for the question it answers
+ * rather than for one of the reasons, because a rate limit is not the store
+ * being unavailable and /x/:id rewrites into this GET: a QR scan that trips
+ * the limit must land in the viewer, not on a page of raw JSON.
+ */
+export function cannotServeResponse(go: boolean, status: number = 503): Response {
   return go
     ? new Response(null, { status: 302, headers: { location: '/s/', 'cache-control': 'no-store' } })
-    : json(status, { ok: false, error: status === 503 ? 'short links unavailable' : 'store unavailable' });
+    : json(status, { ok: false, error: CANNOT_SERVE_ERROR[status] ?? 'store unavailable' });
 }
 
 /** Built per request, never at module load, so the tests never reach a network. */
@@ -275,17 +287,22 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  if (limited('r:' + clientIp(request), READ_LIMIT)) return json(429, { ok: false, error: 'slow down' });
-
   const url = new URL(request.url);
+  /* go is read before the rate limit on purpose: link-preview fetchers from
+     WhatsApp, Slack and Facebook arrive from shared address pools and will
+     trip 30/minute on a popular link, and every one of those is a scan that
+     must end up in the viewer rather than looking at raw JSON */
   const go = url.searchParams.get('go') === '1';
+
+  if (limited('r:' + clientIp(request), READ_LIMIT)) return cannotServeResponse(go, 429);
+
   const store = envStore();
   if (!store) {
-    return storeUnavailableResponse(go, 503);
+    return cannotServeResponse(go, 503);
   }
   try {
     return await handleGet({ id: url.searchParams.get('id'), go }, store);
   } catch {
-    return storeUnavailableResponse(go, 502);
+    return cannotServeResponse(go, 502);
   }
 }

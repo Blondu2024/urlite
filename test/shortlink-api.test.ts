@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { handlePost, handleGet, keyOf, type Store, POST, GET, ALLOWED_ORIGIN, limited, storeUnavailableResponse } from '../api/link';
+import { handlePost, handleGet, keyOf, type Store, POST, GET, ALLOWED_ORIGIN, limited, cannotServeResponse } from '../api/link';
 import { buildPreset } from '../src/site/presets';
 import { encodeSite } from '../src/site/codec';
 
@@ -264,30 +264,67 @@ describe('GET wrapper', () => {
   });
 });
 
-describe('storeUnavailableResponse', () => {
+describe('cannotServeResponse', () => {
   it('redirects to /s/ when go=true, regardless of status code', () => {
-    const res503 = storeUnavailableResponse(true, 503);
-    expect(res503.status).toBe(302);
-    expect(res503.headers.get('location')).toBe('/s/');
-    expect(res503.headers.get('cache-control')).toBe('no-store');
-
-    const res502 = storeUnavailableResponse(true, 502);
-    expect(res502.status).toBe(302);
-    expect(res502.headers.get('location')).toBe('/s/');
-    expect(res502.headers.get('cache-control')).toBe('no-store');
+    for (const status of [429, 502, 503]) {
+      const res = cannotServeResponse(true, status);
+      expect(res.status).toBe(302);
+      expect(res.headers.get('location')).toBe('/s/');
+      expect(res.headers.get('cache-control')).toBe('no-store');
+    }
   });
 
   it('returns JSON error when go=false, with the appropriate status code', async () => {
-    const res503 = storeUnavailableResponse(false, 503);
+    const res503 = cannotServeResponse(false, 503);
     expect(res503.status).toBe(503);
     expect(res503.headers.get('content-type')).toBe('application/json');
     const body503 = (await res503.json()) as Record<string, unknown>;
     expect(body503.error).toBe('short links unavailable');
 
-    const res502 = storeUnavailableResponse(false, 502);
+    const res502 = cannotServeResponse(false, 502);
     expect(res502.status).toBe(502);
     expect(res502.headers.get('content-type')).toBe('application/json');
     const body502 = (await res502.json()) as Record<string, unknown>;
     expect(body502.error).toBe('store unavailable');
+
+    const res429 = cannotServeResponse(false, 429);
+    expect(res429.status).toBe(429);
+    const body429 = (await res429.json()) as Record<string, unknown>;
+    expect(body429.error).toBe('slow down');
+  });
+});
+
+/**
+ * /x/:id rewrites into this GET, so a QR scan that trips the read limit,
+ * which whole shared address pools do on a popular link, has to land in the
+ * viewer. Showing a scanner raw JSON is the failure this feature exists to
+ * remove.
+ */
+describe('a rate-limited GET', () => {
+  const READ_LIMIT_PROBE = 32; // one past the 30 per minute the GET allows
+
+  /* the limiter counts per address, so each case uses its own */
+  const flood = async (ip: string, go: boolean) => {
+    let last: Response | null = null;
+    for (let i = 0; i < READ_LIMIT_PROBE; i++) {
+      last = await GET(
+        new Request(`https://urlite-x.vercel.app/api/link?id=zzzzzzzzzz${go ? '&go=1' : ''}`, {
+          headers: { 'x-forwarded-for': ip },
+        }),
+      );
+    }
+    return last as Response;
+  };
+
+  it('sends a scan into the viewer rather than showing it JSON', async () => {
+    const res = await flood('203.0.113.7', true);
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('/s/');
+  });
+
+  it('still answers the editor in JSON', async () => {
+    const res = await flood('203.0.113.8', false);
+    expect(res.status).toBe(429);
+    expect((await body(res)).error).toBe('slow down');
   });
 });

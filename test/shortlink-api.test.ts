@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { handlePost, handleGet, keyOf, type Store } from '../api/link';
+import { handlePost, handleGet, keyOf, type Store, POST, ALLOWED_ORIGIN, limited } from '../api/link';
 import { buildPreset } from '../src/site/presets';
 import { encodeSite } from '../src/site/codec';
 
@@ -155,5 +155,58 @@ describe('resolve', () => {
     const res = await handleGet({ id: 'zzzzzzzzzz', go: true }, store);
     expect(res.status).toBe(302);
     expect(res.headers.get('location')).toBe('/s/');
+  });
+});
+
+describe('guards', () => {
+  it('allows the origins the editor is actually served from', () => {
+    expect(ALLOWED_ORIGIN.test('https://urlite.app')).toBe(true);
+    expect(ALLOWED_ORIGIN.test('https://www.urlite.app')).toBe(true);
+    expect(ALLOWED_ORIGIN.test('http://localhost:5173')).toBe(true);
+    expect(ALLOWED_ORIGIN.test('https://urlite-x.vercel.app')).toBe(true);
+  });
+
+  it('refuses everybody else', () => {
+    expect(ALLOWED_ORIGIN.test('https://evil.example')).toBe(false);
+    expect(ALLOWED_ORIGIN.test('https://urlite.app.evil.example')).toBe(false);
+    expect(ALLOWED_ORIGIN.test('')).toBe(false);
+  });
+
+  it('trips the rate limit at the number given and not before', () => {
+    const ip = 'test-' + Math.random();
+    for (let i = 0; i < 4; i++) expect(limited(ip, 4)).toBe(false);
+    expect(limited(ip, 4)).toBe(true);
+  });
+
+  it('counts each address on its own', () => {
+    const a = 'a-' + Math.random();
+    const b = 'b-' + Math.random();
+    for (let i = 0; i < 4; i++) limited(a, 4);
+    expect(limited(a, 4)).toBe(true);
+    expect(limited(b, 4)).toBe(false);
+  });
+});
+
+describe('POST wrapper', () => {
+  it('refuses a request from an origin we do not serve', async () => {
+    const res = await POST(
+      new Request('https://urlite.app/api/link', {
+        method: 'POST',
+        headers: { origin: 'https://evil.example', 'content-type': 'application/json' },
+        body: JSON.stringify({ payload: payloadA }),
+      }),
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it('answers 503 when the store is not configured', async () => {
+    const res = await POST(
+      new Request('https://urlite.app/api/link', {
+        method: 'POST',
+        headers: { origin: 'https://urlite.app', 'content-type': 'application/json' },
+        body: JSON.stringify({ payload: payloadA }),
+      }),
+    );
+    expect(res.status).toBe(503);
   });
 });

@@ -186,3 +186,89 @@ export async function handleGet(
   if (!rec) return json(404, { ok: false, error: 'no such link' });
   return json(200, { ok: true, payload: rec.payload });
 }
+
+declare const process: { env: Record<string, string | undefined> };
+
+/* kept identical to api/rewrite.ts so the two cannot drift apart */
+export const ALLOWED_ORIGIN =
+  /^https?:\/\/(localhost(:\d+)?|urlite\.app|www\.urlite\.app|urlite-[a-z0-9-]+\.vercel\.app)$/i;
+
+const WRITE_LIMIT = 4; // per IP per minute, per warm instance
+const READ_LIMIT = 30;
+
+const hits = new Map<string, number[]>();
+
+export function limited(ip: string, max: number): boolean {
+  const now = Date.now();
+  const w = (hits.get(ip) ?? []).filter((t) => now - t < 60_000);
+  w.push(now);
+  hits.set(ip, w);
+  return w.length > max;
+}
+
+function clientIp(request: Request): string {
+  return (request.headers.get('x-forwarded-for') ?? 'unknown').split(',')[0].trim();
+}
+
+/** Built per request, never at module load, so the tests never reach a network. */
+function envStore(): Store | null {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+  const auth = { authorization: `Bearer ${token}` };
+  return {
+    async get(key) {
+      const r = await fetch(`${url}/get/${encodeURIComponent(key)}`, { headers: auth });
+      if (!r.ok) return null;
+      const d = (await r.json()) as { result?: string | null };
+      return d.result ?? null;
+    },
+    async set(key, value) {
+      const r = await fetch(`${url}/set/${encodeURIComponent(key)}`, {
+        method: 'POST',
+        headers: { ...auth, 'content-type': 'text/plain' },
+        body: value,
+      });
+      if (!r.ok) throw new Error('store write failed');
+    },
+  };
+}
+
+export async function POST(request: Request): Promise<Response> {
+  const origin = request.headers.get('origin') ?? '';
+  if (!ALLOWED_ORIGIN.test(origin)) return json(403, { ok: false, error: 'forbidden' });
+  if (limited(clientIp(request), WRITE_LIMIT)) return json(429, { ok: false, error: 'slow down' });
+
+  const store = envStore();
+  if (!store) return json(503, { ok: false, error: 'short links unavailable' });
+
+  let body: unknown = null;
+  try {
+    body = await request.json();
+  } catch {
+    return json(400, { ok: false, error: 'bad request' });
+  }
+  try {
+    return await handlePost(body, store);
+  } catch {
+    return json(502, { ok: false, error: 'store unavailable' });
+  }
+}
+
+export async function GET(request: Request): Promise<Response> {
+  if (limited(clientIp(request), READ_LIMIT)) return json(429, { ok: false, error: 'slow down' });
+
+  const url = new URL(request.url);
+  const go = url.searchParams.get('go') === '1';
+  const store = envStore();
+  if (!store) {
+    return go
+      ? new Response(null, { status: 302, headers: { location: '/s/', 'cache-control': 'no-store' } })
+      : json(503, { ok: false, error: 'short links unavailable' });
+  }
+  try {
+    return await handleGet({ id: url.searchParams.get('id'), go }, store);
+  } catch {
+    return json(502, { ok: false, error: 'store unavailable' });
+  }
+}

@@ -75,6 +75,46 @@ describe('the printable link section', () => {
   });
 });
 
+/**
+ * The Share dialog was the loudest place the claim appeared, but it is not
+ * the only one. A short link is a real exception to "no server, no database",
+ * so nowhere in the project may state it flat.
+ */
+describe('the no-backend claim, everywhere it is made', () => {
+  const read = async (rel: string) => {
+    const { readFileSync } = await import('node:fs');
+    const { resolve } = await import('node:path');
+    return readFileSync(resolve(__dirname, '..', rel), 'utf8');
+  };
+
+  it('is qualified in the README', async () => {
+    const text = await read('README.md');
+    const line = text.split('\n').find((l) => l.includes('There is no database'));
+    expect(line).toBeTruthy();
+    expect(text).toMatch(/holds unless you choose a short link/);
+  });
+
+  it('is qualified on the landing page', async () => {
+    const text = await read('src/app/Landing.tsx');
+    expect(text).not.toContain('>No server · no database · no account<');
+    expect(text).toContain('By default: no server · no database · no account');
+  });
+
+  it('is qualified in the meta description', async () => {
+    const text = await read('index.html');
+    const m = /<meta name="description" content="([^"]+)"/.exec(text);
+    expect(m).toBeTruthy();
+    expect(m?.[1]).toContain('By default');
+    expect(m?.[1]).not.toContain('—');
+  });
+
+  it('does not say the record holds nothing but a payload and a hash', async () => {
+    const text = await read('README.md');
+    /* it also holds createdAt and updatedAt */
+    expect(text).toContain('created and last changed');
+  });
+});
+
 describe('the long link is exactly what it was', () => {
   it('encodes the same bytes as before short links existed', () => {
     /* golden value: if this changes, the codec changed, and every link

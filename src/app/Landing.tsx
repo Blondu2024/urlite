@@ -76,7 +76,7 @@ export function Landing({ nav }: { nav: (p: string) => void }) {
 
       <div className="hero-l">
         <div className="wrap">
-          <p className="kick rise">No server · no database · no account</p>
+          <p className="kick rise">By default: no server · no database · no account</p>
           <h1 className="rise">
             The website that lives <em>inside a link.</em>
           </h1>

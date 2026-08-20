@@ -10,6 +10,7 @@ https://urlite.app/s/#v1.<deflate → base64url of the site's JSON>
 ```
 
 The fragment never reaches any server. There is no database, no account, no analytics.
+That holds unless you choose a short link, the one opt-in exception, described below.
 The link **is** the website: whoever holds it holds the site. A typical finished site
 weighs **~3 KB** — about 800× lighter than the average web page — and small enough that
 the whole website fits inside a QR code.
@@ -97,9 +98,10 @@ made the two templates aimed at businesses the two you could not print.
 
 So there is one optional exception to "no backend". Press "Make a short link I
 can print" in the share dialog and you get `urlite-x.vercel.app/x/<id>`, which
-answers a redirect into the ordinary viewer. Two things are stored against that
-id: the same encoded site your long link already carries, and a SHA-256 of the
-key you are given. Nothing else. No account, no email, no analytics, no cookie.
+answers a redirect into the ordinary viewer. Four things are stored against that
+id: the same encoded site your long link already carries, a SHA-256 of the key
+you are given, and the times that record was created and last changed. Nothing
+else. No account, no email, no analytics, no cookie.
 
 The key is a second link. Keep it. It is the only way to change what an already
 printed code shows, and nobody can recover it for you.

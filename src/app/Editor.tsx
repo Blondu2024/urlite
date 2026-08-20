@@ -53,6 +53,31 @@ export function manageKeyFor(source: ConfigSource, stored: ManageKey | null): Ma
   return source === 'draft' ? stored : null;
 }
 
+/**
+ * Door three, and it needs a reload to see, which is why nobody should
+ * delete this thinking it is a duplicate of manageKeyFor.
+ *
+ * manageKeyFor only withholds the key for the life of one page load. The
+ * debounce below writes DRAFT_KEY on every tick no matter where the config
+ * came from, so opening somebody else's editable link overwrites your draft
+ * with their site while the stored key sits untouched. Sequence:
+ *
+ *   1. You make a short link: urlite-manage holds your key, urlite-draft
+ *      holds your site.
+ *   2. You open a friend's /app#v1.<their site>. No bar appears (correct),
+ *      but 250ms later their site is in urlite-draft.
+ *   3. You open a plain /app. The draft is now their site, the source is
+ *      'draft', so the stored key is handed back, the bar renders over
+ *      their site, and "Update" pushes it to your printed code.
+ *
+ * The moment a foreign config is allowed to overwrite the draft, the stored
+ * key demonstrably no longer belongs to the draft, so it has to go from
+ * storage, not merely be withheld from this render.
+ */
+export function shouldForgetStoredKey(source: ConfigSource): boolean {
+  return source === 'hash';
+}
+
 function Logo({ onClick }: { onClick: () => void }) {
   return (
     <button className="logo" onClick={onClick} aria-label="Urlite home">
@@ -176,11 +201,14 @@ function StartScreen({ onPick, notice }: { onPick: (cfg: SiteConfig) => void; no
 }
 
 export function Editor({ nav }: { nav: (p: string) => void }) {
-  const [config, setConfig] = useState<SiteConfig | null>(() => initialConfig().config);
+  /* read once: initialConfig() touches location and storage, and both halves
+     of the answer (the config and where it came from) must agree */
+  const [boot] = useState(initialConfig);
+  const [config, setConfig] = useState<SiteConfig | null>(boot.config);
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [shareOpen, setShareOpen] = useState(false);
   const [manage, setManage] = useState<ManageKey | null>(() =>
-    manageKeyFor(initialConfig().source, loadManageKey()),
+    manageKeyFor(boot.source, loadManageKey()),
   );
   const [pushing, setPushing] = useState<'' | 'busy' | 'done' | 'failed'>('');
   /* only meaningful while config is null: are we resolving a management
@@ -192,6 +220,14 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
 
   const encoded = useMemo(() => (config ? encodeSite(config) : ''), [config]);
   const viewUrl = encoded ? `${location.origin}/s/#${encoded}` : '';
+
+  /* Door three (see shouldForgetStoredKey): this config came from somebody
+     else's link and the debounce below is about to write it into the draft,
+     so the stored key stops belonging to the draft right here. Removing this
+     re-opens the three-step sequence documented above. */
+  useEffect(() => {
+    if (shouldForgetStoredKey(boot.source)) clearManageKey();
+  }, [boot.source]);
 
   /* a management link opens the live version of a printed site, not the copy
      that link was made from, because that copy would be frozen at creation

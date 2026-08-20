@@ -7,7 +7,7 @@ import {
   saveManageKey,
   type ManageKey,
 } from '../src/app/shortlink';
-import { manageKeyFor } from '../src/app/Editor';
+import { manageKeyFor, shouldForgetStoredKey, type ConfigSource } from '../src/app/Editor';
 
 /**
  * The key to a printed site has to survive a reload without living in the
@@ -77,5 +77,65 @@ describe('manageKeyFor: which config may keep the stored key', () => {
 
   it('returns null for no source when nothing was ever stored', () => {
     expect(manageKeyFor(null, null)).toBeNull();
+  });
+});
+
+/**
+ * Door three. manageKeyFor only withholds the key for one page load, but the
+ * editor's debounce writes the draft on every tick whatever the config is, so
+ * a foreign config that is allowed into the draft outlives the render that
+ * withheld the key. The key has to leave storage, not just this render.
+ */
+describe('shouldForgetStoredKey: when the key stops belonging to the draft', () => {
+  it('forgets it when the config came from somebody else’s hash', () => {
+    expect(shouldForgetStoredKey('hash')).toBe(true);
+  });
+
+  it('keeps it for the draft it was saved alongside', () => {
+    expect(shouldForgetStoredKey('draft')).toBe(false);
+  });
+
+  it('keeps it while a management link is still resolving', () => {
+    /* source null is also the manage-link case, where the mount effect
+       proves the key by fetching the payload; wiping here would break
+       opening your own printed site */
+    expect(shouldForgetStoredKey(null)).toBe(false);
+  });
+});
+
+/**
+ * The whole three-step sequence, played out against real storage using only
+ * the pure rules. No React, no DOM harness: each step is exactly what the
+ * editor does at mount for that source.
+ */
+describe('the three-step door: short link, friend’s link, plain /app', () => {
+  const mine: ManageKey = { id: 'a7fq2m9k3p', secret: 'AbCdEfGhIjKlMnOpQrStUv' };
+
+  /** what the editor does at mount, for a config from `source` */
+  const mount = (source: ConfigSource) => {
+    const key = manageKeyFor(source, loadManageKey());
+    if (shouldForgetStoredKey(source)) clearManageKey();
+    return key;
+  };
+
+  it('does not offer the key over a friend’s site after a reload', () => {
+    // 1. you made a short link, so the key is stored next to your draft
+    saveManageKey(mine);
+    expect(mount('draft')).toEqual(mine);
+
+    // 2. you open a friend's editable link; no bar, but the debounce is
+    //    about to write THEIR site into urlite-draft
+    expect(mount('hash')).toBeNull();
+
+    // 3. you open a plain /app: the draft is now their site
+    expect(loadManageKey()).toBeNull();
+    expect(mount('draft')).toBeNull();
+  });
+
+  it('still restores the key across an ordinary reload of your own draft', () => {
+    saveManageKey(mine);
+    expect(mount('draft')).toEqual(mine);
+    expect(mount('draft')).toEqual(mine);
+    expect(loadManageKey()).toEqual(mine);
   });
 });

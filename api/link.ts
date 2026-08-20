@@ -164,3 +164,25 @@ export async function handlePost(
   await store.set(keyOf(b.id), JSON.stringify(next));
   return json(200, { ok: true });
 }
+
+export async function handleGet(
+  params: { id: unknown; go: boolean },
+  store: Store,
+): Promise<Response> {
+  const rec = isId(params.id) ? await read(store, params.id) : null;
+
+  if (params.go) {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        /* relative on purpose: the redirect can never leave the host it
+           arrived on, which is what keeps short links off the brand domain */
+        location: rec ? '/s/#' + rec.payload : '/s/',
+        'cache-control': 'no-store',
+      },
+    });
+  }
+
+  if (!rec) return json(404, { ok: false, error: 'no such link' });
+  return json(200, { ok: true, payload: rec.payload });
+}

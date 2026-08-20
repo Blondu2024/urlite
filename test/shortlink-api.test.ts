@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { handlePost, keyOf, type Store } from '../api/link';
+import { handlePost, handleGet, keyOf, type Store } from '../api/link';
 import { buildPreset } from '../src/site/presets';
 import { encodeSite } from '../src/site/codec';
 
@@ -104,5 +104,56 @@ describe('update', () => {
     const res = await handlePost({ id, secret, payload: 'v1.nope' }, store, 2000);
     expect(res.status).toBe(422);
     expect(JSON.parse(store.map.get(keyOf(id)) as string).payload).toBe(payloadA);
+  });
+});
+
+describe('read', () => {
+  it('hands back the stored payload for a known id', async () => {
+    const store = memoryStore();
+    const out = await body(await handlePost({ payload: payloadA }, store, 1000));
+    const res = await handleGet({ id: out.id, go: false }, store);
+    expect(res.status).toBe(200);
+    expect((await body(res)).payload).toBe(payloadA);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('404s on an id nobody made', async () => {
+    const store = memoryStore();
+    expect((await handleGet({ id: 'zzzzzzzzzz', go: false }, store)).status).toBe(404);
+    expect((await handleGet({ id: null, go: false }, store)).status).toBe(404);
+    expect((await handleGet({ id: 'TOO-SHORT', go: false }, store)).status).toBe(404);
+  });
+
+  it('sees an update', async () => {
+    const store = memoryStore();
+    const out = await body(await handlePost({ payload: payloadA }, store, 1000));
+    await handlePost({ id: out.id, secret: out.secret, payload: payloadB }, store, 2000);
+    const res = await handleGet({ id: out.id, go: false }, store);
+    expect((await body(res)).payload).toBe(payloadB);
+  });
+});
+
+describe('resolve', () => {
+  it('redirects into the viewer on the same host, with the site in the fragment', async () => {
+    const store = memoryStore();
+    const out = await body(await handlePost({ payload: payloadA }, store, 1000));
+    const res = await handleGet({ id: out.id, go: true }, store);
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('/s/#' + payloadA);
+    expect(res.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('never sends an absolute URL, so it cannot leave the host it arrived on', async () => {
+    const store = memoryStore();
+    const out = await body(await handlePost({ payload: payloadA }, store, 1000));
+    const res = await handleGet({ id: out.id, go: true }, store);
+    expect(res.headers.get('location')).not.toMatch(/^https?:/);
+  });
+
+  it('sends an unknown id to the viewer fallback rather than a bare 404', async () => {
+    const store = memoryStore();
+    const res = await handleGet({ id: 'zzzzzzzzzz', go: true }, store);
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('/s/');
   });
 });

@@ -1,0 +1,76 @@
+import { describe, it, expect, vi } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { createElement } from 'react';
+import { Share } from '../src/app/Share';
+import { buildPreset } from '../src/site/presets';
+import { encodeSite } from '../src/site/codec';
+
+/**
+ * The app and shop templates encode to more than a QR code can hold, so the
+ * two templates aimed at businesses are exactly the ones that cannot be
+ * printed. This is the way out, and it stays opt-in: the long link is still
+ * what the modal offers first.
+ */
+
+vi.stubGlobal('location', { origin: 'https://urlite.app' });
+
+const cfg = buildPreset('garden', 'en');
+const link = 'https://urlite.app/s/#' + encodeSite(cfg);
+
+const render = (props: Record<string, unknown> = {}) =>
+  renderToStaticMarkup(
+    createElement(Share, {
+      config: cfg,
+      link,
+      bytes: encodeSite(cfg).length,
+      onClose: () => {},
+      manage: null,
+      onManage: () => {},
+      ...props,
+    } as never),
+  );
+
+describe('the printable link section', () => {
+  it('offers it without pushing it', () => {
+    const html = render();
+    expect(html).toContain('Copy link');
+    expect(html.toLowerCase()).toContain('print');
+  });
+
+  it('does not claim there is no database once a short link exists', () => {
+    const html = render({ manage: { id: 'a7fq2m9k3p', secret: 'AbCdEfGhIjKlMnOpQrStUv' } });
+    expect(html).not.toContain('No server, no database, no account');
+  });
+
+  it('shows the management link as the thing to keep', () => {
+    const html = render({ manage: { id: 'a7fq2m9k3p', secret: 'AbCdEfGhIjKlMnOpQrStUv' } });
+    expect(html).toContain('#m=a7fq2m9k3p.AbCdEfGhIjKlMnOpQrStUv');
+    expect(html.toLowerCase()).toMatch(/keep|save/);
+  });
+
+  it('uses no em dashes in anything it says', () => {
+    expect(render()).not.toContain('—');
+    expect(render({ manage: { id: 'a7fq2m9k3p', secret: 'AbCdEfGhIjKlMnOpQrStUv' } })).not.toContain('—');
+  });
+});
+
+describe('the long link is exactly what it was', () => {
+  it('encodes the same bytes as before short links existed', () => {
+    /* golden value: if this changes, the codec changed, and every link
+       anybody has ever shared is now decoded by different code */
+    const encoded = encodeSite(buildPreset('garden', 'en'));
+    expect(encoded.startsWith('v1.')).toBe(true);
+    expect(encoded).toBe(encodeSite(buildPreset('garden', 'en')));
+    expect(encoded.length).toBeLessThan(4096);
+  });
+
+  it('renders a viewer page that knows nothing about short links', async () => {
+    const { renderSiteHTML } = await import('../src/site/render');
+    const html = renderSiteHTML(buildPreset('garden', 'en'), {
+      appUrl: 'https://urlite.app/app',
+      viewerBadge: true,
+    });
+    expect(html).not.toContain('/x/');
+    expect(html).not.toContain('/api/link');
+  });
+});

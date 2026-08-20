@@ -3,6 +3,7 @@ import QRCode from 'qrcode';
 import type { SiteConfig } from '../site/types';
 import { renderSiteHTML } from '../site/render';
 import { collectImageUrls, embedImages } from '../site/embed';
+import { createShortLink, manageUrl, type ManageKey } from './shortlink';
 
 const AVERAGE_PAGE_BYTES = 2.4 * 1024 * 1024; // httparchive median-ish, for the punchline
 
@@ -11,23 +12,29 @@ export function Share(props: {
   link: string;
   bytes: number;
   onClose: () => void;
+  manage: ManageKey | null;
+  onManage: (key: ManageKey) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [credit, setCredit] = useState(true);
   const [packing, setPacking] = useState(false);
   const [qrOk, setQrOk] = useState(true);
+  const [shortUrl, setShortUrl] = useState<string | null>(null);
+  const [making, setMaking] = useState(false);
+  const [shortErr, setShortErr] = useState('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
+    setQrOk(true);
     const canvas = canvasRef.current;
     if (!canvas) return;
-    QRCode.toCanvas(canvas, props.link, {
+    QRCode.toCanvas(canvas, shortUrl ?? props.link, {
       width: 164,
       margin: 1,
       errorCorrectionLevel: 'L',
       color: { dark: '#141414', light: '#ffffff' },
     }).catch(() => setQrOk(false));
-  }, [props.link]);
+  }, [props.link, shortUrl]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && props.onClose();
@@ -80,8 +87,9 @@ export function Share(props: {
         <button className="x" onClick={props.onClose} aria-label="Close">✕</button>
         <h2>This link <em style={{ fontStyle: 'italic' }}>is</em> the website.</h2>
         <p className="sub">
-          No server, no database, no account. The whole site — every word, colour and photo
-          address — is folded into the characters of the link itself.
+          {props.manage
+            ? 'The whole site still travels in the long link below. The short link is the only thing we remember for you, so a printed code can keep up with your edits.'
+            : 'No server, no database, no account. The whole site, every word, colour and photo address, is folded into the characters of the link itself.'}
         </p>
 
         <div className="share-link">
@@ -94,13 +102,73 @@ export function Share(props: {
         <div className="share-meta">
           {qrOk && <canvas ref={canvasRef} className="qr" aria-label="QR code of your website" />}
           <div className="facts">
-            Your entire website weighs <b>{kb} KB</b> — about <b>{ratio.toLocaleString()}×</b>{' '}
+            Your entire website weighs <b>{kb} KB</b>, about <b>{ratio.toLocaleString()}×</b>{' '}
             lighter than the average web page. Anyone who opens the link gets the full site;
             anyone who opens it in the editor can keep working on it.
             {qrOk && <> The QR code on the left contains the whole website too.</>}
             {' '}The downloaded HTML file goes one step further: it packs the photos
             themselves inside, so it works even offline.
           </div>
+        </div>
+
+        <div className="share-print">
+          {shortUrl || props.manage ? (
+            <>
+              <div className="share-link">
+                <input readOnly value={shortUrl ?? ''} onFocus={(e) => e.target.select()} />
+              </div>
+              <p className="note">
+                This is the link to print. Edit the site later and press
+                “Update the printed link”, and every code already out there
+                shows the new version.
+              </p>
+              {props.manage && (
+                <>
+                  <div className="share-link">
+                    <input
+                      readOnly
+                      value={manageUrl(props.manage, location.origin)}
+                      onFocus={(e) => e.target.select()}
+                    />
+                  </div>
+                  <p className="note warn">
+                    Keep this second link somewhere safe. It is the key to your
+                    site. Anyone who has it can change what the printed code
+                    shows, and nobody can get it back for you if you lose it.
+                  </p>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <p className="note">
+                Going on a sign, a van or a business card? A short link stays
+                the same when you edit the site, and its code fits however big
+                the site grows.
+              </p>
+              <button
+                className="btn btn-k btn-sm"
+                disabled={making}
+                onClick={async () => {
+                  if (making) return;
+                  setMaking(true);
+                  setShortErr('');
+                  try {
+                    const made = await createShortLink(props.link.split('#')[1] ?? '');
+                    setShortUrl(made.url);
+                    props.onManage(made.key);
+                  } catch {
+                    setShortErr('Could not make a short link just now. Try again in a minute.');
+                  } finally {
+                    setMaking(false);
+                  }
+                }}
+              >
+                {making ? 'Making it…' : 'Make a short link I can print'}
+              </button>
+              {shortErr && <p className="note warn">{shortErr}</p>}
+            </>
+          )}
         </div>
 
         <div className="share-actions">

@@ -8,6 +8,7 @@ import { buildPreset, PRESETS, type Lang } from '../site/presets';
 import { Acc, Area, IconPicker, ImageField, Text, Toggle } from './fields';
 import { importSite } from '../import/importSite';
 import { Share } from './Share';
+import { saveManageKey, type ManageKey } from './shortlink';
 
 const DRAFT_KEY = 'urlite-draft';
 
@@ -148,6 +149,7 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
   const [config, setConfig] = useState<SiteConfig | null>(initialConfig);
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [shareOpen, setShareOpen] = useState(false);
+  const [manage, setManage] = useState<ManageKey | null>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const scrollRef = useRef(0);
   const [previewHtml, setPreviewHtml] = useState('');
@@ -577,7 +579,19 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
         </div>
       </div>
 
-      {shareOpen && <Share config={config} link={viewUrl} bytes={encoded.length} onClose={() => setShareOpen(false)} />}
+      {shareOpen && (
+        <Share
+          config={config}
+          link={viewUrl}
+          bytes={encoded.length}
+          onClose={() => setShareOpen(false)}
+          manage={manage}
+          onManage={(k) => {
+            setManage(k);
+            saveManageKey(k);
+          }}
+        />
+      )}
     </div>
   );
 }

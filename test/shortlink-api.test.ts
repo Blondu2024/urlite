@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { handlePost, handleGet, keyOf, type Store, POST, ALLOWED_ORIGIN, limited } from '../api/link';
+import { handlePost, handleGet, keyOf, type Store, POST, GET, ALLOWED_ORIGIN, limited } from '../api/link';
 import { buildPreset } from '../src/site/presets';
 import { encodeSite } from '../src/site/codec';
 
@@ -185,6 +185,22 @@ describe('guards', () => {
     expect(limited(a, 4)).toBe(true);
     expect(limited(b, 4)).toBe(false);
   });
+
+  it('write and read quotas are independent', () => {
+    const ip = 'quota-test-' + Math.random();
+    // Exhaust write quota for this IP
+    for (let i = 0; i < 4; i++) expect(limited('w:' + ip, 4)).toBe(false);
+    expect(limited('w:' + ip, 4)).toBe(true); // write limit hit
+    // Read quota for same IP is still available
+    expect(limited('r:' + ip, 30)).toBe(false);
+
+    const ip2 = 'quota-test2-' + Math.random();
+    // Exhaust read quota for this IP
+    for (let i = 0; i < 30; i++) expect(limited('r:' + ip2, 30)).toBe(false);
+    expect(limited('r:' + ip2, 30)).toBe(true); // read limit hit
+    // Write quota for same IP is still available
+    expect(limited('w:' + ip2, 4)).toBe(false);
+  });
 });
 
 describe('POST wrapper', () => {
@@ -208,5 +224,28 @@ describe('POST wrapper', () => {
       }),
     );
     expect(res.status).toBe(503);
+  });
+});
+
+describe('GET wrapper', () => {
+  it('returns 503 when store is not configured', async () => {
+    const res = await GET(
+      new Request('https://urlite.app/api/link?id=zzzzzzzzzz', {
+        method: 'GET',
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    expect(res.status).toBe(503);
+  });
+
+  it('with go=1 redirects to /s/ when store is not configured', async () => {
+    const res = await GET(
+      new Request('https://urlite.app/api/link?id=zzzzzzzzzz&go=1', {
+        method: 'GET',
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('/s/');
   });
 });

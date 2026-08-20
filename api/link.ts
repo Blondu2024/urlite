@@ -198,11 +198,11 @@ const READ_LIMIT = 30;
 
 const hits = new Map<string, number[]>();
 
-export function limited(ip: string, max: number): boolean {
+export function limited(key: string, max: number): boolean {
   const now = Date.now();
-  const w = (hits.get(ip) ?? []).filter((t) => now - t < 60_000);
+  const w = (hits.get(key) ?? []).filter((t) => now - t < 60_000);
   w.push(now);
-  hits.set(ip, w);
+  hits.set(key, w);
   return w.length > max;
 }
 
@@ -219,7 +219,7 @@ function envStore(): Store | null {
   return {
     async get(key) {
       const r = await fetch(`${url}/get/${encodeURIComponent(key)}`, { headers: auth });
-      if (!r.ok) return null;
+      if (!r.ok) throw new Error('store read failed');
       const d = (await r.json()) as { result?: string | null };
       return d.result ?? null;
     },
@@ -237,7 +237,7 @@ function envStore(): Store | null {
 export async function POST(request: Request): Promise<Response> {
   const origin = request.headers.get('origin') ?? '';
   if (!ALLOWED_ORIGIN.test(origin)) return json(403, { ok: false, error: 'forbidden' });
-  if (limited(clientIp(request), WRITE_LIMIT)) return json(429, { ok: false, error: 'slow down' });
+  if (limited('w:' + clientIp(request), WRITE_LIMIT)) return json(429, { ok: false, error: 'slow down' });
 
   const store = envStore();
   if (!store) return json(503, { ok: false, error: 'short links unavailable' });
@@ -256,7 +256,7 @@ export async function POST(request: Request): Promise<Response> {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  if (limited(clientIp(request), READ_LIMIT)) return json(429, { ok: false, error: 'slow down' });
+  if (limited('r:' + clientIp(request), READ_LIMIT)) return json(429, { ok: false, error: 'slow down' });
 
   const url = new URL(request.url);
   const go = url.searchParams.get('go') === '1';

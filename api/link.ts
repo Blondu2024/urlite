@@ -128,6 +128,8 @@ async function read(store: Store, id: string): Promise<LinkRecord | null> {
   }
 }
 
+declare const process: { env: Record<string, string | undefined> };
+
 export async function handlePost(
   body: unknown,
   store: Store,
@@ -148,7 +150,8 @@ export async function handlePost(
       updatedAt: now,
     };
     await store.set(keyOf(id), JSON.stringify(rec));
-    return json(200, { ok: true, id, secret });
+    const host = process.env.SHORT_HOST || 'urlite-x.vercel.app';
+    return json(200, { ok: true, id, secret, url: `https://${host}/x/${id}` });
   }
 
   if (!isId(b.id) || typeof b.secret !== 'string') {
@@ -186,8 +189,6 @@ export async function handleGet(
   if (!rec) return json(404, { ok: false, error: 'no such link' });
   return json(200, { ok: true, payload: rec.payload });
 }
-
-declare const process: { env: Record<string, string | undefined> };
 
 /* kept identical to api/rewrite.ts so the two cannot drift apart */
 export const ALLOWED_ORIGIN =

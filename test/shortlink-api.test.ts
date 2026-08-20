@@ -66,6 +66,12 @@ describe('create', () => {
     expect((await handlePost(null, store, 1000)).status).toBe(400);
     expect((await handlePost({}, store, 1000)).status).toBe(400);
   });
+
+  it('hands back a short url on the host meant for it', async () => {
+    const store = memoryStore();
+    const out = await body(await handlePost({ payload: payloadA }, store, 1000));
+    expect(out.url).toBe(`https://urlite-x.vercel.app/x/${out.id}`);
+  });
 });
 
 describe('update', () => {

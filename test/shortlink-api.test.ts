@@ -15,6 +15,7 @@ import {
   rateLimitBuckets,
   cannotServeResponse,
   validPayload,
+  storeConfigFromEnv,
 } from '../api/link';
 import { buildPreset } from '../src/site/presets';
 import { encodeSite } from '../src/site/codec';
@@ -506,5 +507,44 @@ describe('the rate limiter does not grow forever', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe('storeConfigFromEnv', () => {
+  const KV = { KV_REST_API_URL: 'https://kv.example', KV_REST_API_TOKEN: 'kv-token' };
+  const UP = {
+    UPSTASH_REDIS_REST_URL: 'https://up.example',
+    UPSTASH_REDIS_REST_TOKEN: 'up-token',
+  };
+
+  it('reads the pair Vercel injects', () => {
+    expect(storeConfigFromEnv({ ...KV })).toEqual({ url: 'https://kv.example', token: 'kv-token' });
+  });
+
+  it('reads the pair a hand-wired database carries', () => {
+    expect(storeConfigFromEnv({ ...UP })).toEqual({ url: 'https://up.example', token: 'up-token' });
+  });
+
+  it('prefers the injected pair when both are present, and never mixes them', () => {
+    expect(storeConfigFromEnv({ ...KV, ...UP })).toEqual({
+      url: 'https://kv.example',
+      token: 'kv-token',
+    });
+  });
+
+  it('refuses a half pair rather than borrowing the other half', () => {
+    /* the landmine: one database's url with another database's token */
+    expect(storeConfigFromEnv({ KV_REST_API_URL: KV.KV_REST_API_URL, ...UP })).toEqual({
+      url: 'https://up.example',
+      token: 'up-token',
+    });
+    expect(
+      storeConfigFromEnv({ KV_REST_API_URL: KV.KV_REST_API_URL, UPSTASH_REDIS_REST_TOKEN: 'x' }),
+    ).toBeNull();
+    expect(storeConfigFromEnv({ KV_REST_API_TOKEN: 'x' })).toBeNull();
+  });
+
+  it('is null when nothing is configured', () => {
+    expect(storeConfigFromEnv({})).toBeNull();
   });
 });

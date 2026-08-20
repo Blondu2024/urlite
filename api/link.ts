@@ -283,10 +283,30 @@ export function cannotServeResponse(go: boolean, status: number = 503): Response
 }
 
 /** Built per request, never at module load, so the tests never reach a network. */
+/**
+ * Two naming schemes reach us, and they must never be mixed. Vercel's Upstash
+ * integration injects KV_REST_API_URL and KV_REST_API_TOKEN; a database wired
+ * up by hand carries Upstash's own UPSTASH_REDIS_REST_* names. Taking the url
+ * from one pair and the token from the other points at one database with
+ * another's credentials, so every write fails on auth. Each pair is therefore
+ * all or nothing.
+ */
+export function storeConfigFromEnv(
+  env: Record<string, string | undefined>,
+): { url: string; token: string } | null {
+  if (env.KV_REST_API_URL && env.KV_REST_API_TOKEN) {
+    return { url: env.KV_REST_API_URL, token: env.KV_REST_API_TOKEN };
+  }
+  if (env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN) {
+    return { url: env.UPSTASH_REDIS_REST_URL, token: env.UPSTASH_REDIS_REST_TOKEN };
+  }
+  return null;
+}
+
 function envStore(): Store | null {
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  if (!url || !token) return null;
+  const cfg = storeConfigFromEnv(process.env);
+  if (!cfg) return null;
+  const { url, token } = cfg;
   const auth = { authorization: `Bearer ${token}` };
   return {
     async get(key) {

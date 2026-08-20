@@ -210,6 +210,12 @@ function clientIp(request: Request): string {
   return (request.headers.get('x-forwarded-for') ?? 'unknown').split(',')[0].trim();
 }
 
+export function storeUnavailableResponse(go: boolean, status: number = 503): Response {
+  return go
+    ? new Response(null, { status: 302, headers: { location: '/s/', 'cache-control': 'no-store' } })
+    : json(status, { ok: false, error: status === 503 ? 'short links unavailable' : 'store unavailable' });
+}
+
 /** Built per request, never at module load, so the tests never reach a network. */
 function envStore(): Store | null {
   const url = process.env.UPSTASH_REDIS_REST_URL;
@@ -262,13 +268,11 @@ export async function GET(request: Request): Promise<Response> {
   const go = url.searchParams.get('go') === '1';
   const store = envStore();
   if (!store) {
-    return go
-      ? new Response(null, { status: 302, headers: { location: '/s/', 'cache-control': 'no-store' } })
-      : json(503, { ok: false, error: 'short links unavailable' });
+    return storeUnavailableResponse(go, 503);
   }
   try {
     return await handleGet({ id: url.searchParams.get('id'), go }, store);
   } catch {
-    return json(502, { ok: false, error: 'store unavailable' });
+    return storeUnavailableResponse(go, 502);
   }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { handlePost, handleGet, keyOf, type Store, POST, GET, ALLOWED_ORIGIN, limited } from '../api/link';
+import { handlePost, handleGet, keyOf, type Store, POST, GET, ALLOWED_ORIGIN, limited, storeUnavailableResponse } from '../api/link';
 import { buildPreset } from '../src/site/presets';
 import { encodeSite } from '../src/site/codec';
 
@@ -247,5 +247,33 @@ describe('GET wrapper', () => {
     );
     expect(res.status).toBe(302);
     expect(res.headers.get('location')).toBe('/s/');
+  });
+});
+
+describe('storeUnavailableResponse', () => {
+  it('redirects to /s/ when go=true, regardless of status code', () => {
+    const res503 = storeUnavailableResponse(true, 503);
+    expect(res503.status).toBe(302);
+    expect(res503.headers.get('location')).toBe('/s/');
+    expect(res503.headers.get('cache-control')).toBe('no-store');
+
+    const res502 = storeUnavailableResponse(true, 502);
+    expect(res502.status).toBe(302);
+    expect(res502.headers.get('location')).toBe('/s/');
+    expect(res502.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('returns JSON error when go=false, with the appropriate status code', async () => {
+    const res503 = storeUnavailableResponse(false, 503);
+    expect(res503.status).toBe(503);
+    expect(res503.headers.get('content-type')).toBe('application/json');
+    const body503 = (await res503.json()) as Record<string, unknown>;
+    expect(body503.error).toBe('short links unavailable');
+
+    const res502 = storeUnavailableResponse(false, 502);
+    expect(res502.status).toBe(502);
+    expect(res502.headers.get('content-type')).toBe('application/json');
+    const body502 = (await res502.json()) as Record<string, unknown>;
+    expect(body502.error).toBe('store unavailable');
   });
 });

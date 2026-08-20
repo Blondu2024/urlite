@@ -20,16 +20,37 @@ import {
 
 const DRAFT_KEY = 'urlite-draft';
 
-function initialConfig(): SiteConfig | null {
+/** Where the config on screen came from. Only 'draft' provably owns whatever
+    management key is sitting in storage: a shared v1. link is somebody
+    else's site and must never inherit it (see manageKeyFor). */
+export type ConfigSource = 'hash' | 'draft' | null;
+
+function initialConfig(): { config: SiteConfig | null; source: ConfigSource } {
+  /* a management hash (#m=id.secret) never decodes as a site payload, so
+     without this guard the very first render would fall through to
+     whatever old draft happens to be sitting in storage, an unrelated site
+     rendered under a bar that claims a printed link points at it. The
+     mount effect resolves the real, current payload; until then this must
+     stay empty rather than guess. */
+  if (parseManageHash(location.hash)) return { config: null, source: null };
   const fromHash = decodeSite(location.hash);
-  if (fromHash !== null) return normalizeConfig(fromHash);
+  if (fromHash !== null) return { config: normalizeConfig(fromHash), source: 'hash' };
   try {
     const raw = localStorage.getItem(DRAFT_KEY);
-    if (raw) return normalizeConfig(JSON.parse(raw));
+    if (raw) return { config: normalizeConfig(JSON.parse(raw)), source: 'draft' };
   } catch {
-    /* corrupted draft — start fresh */
+    /* corrupted draft, start fresh */
   }
-  return null;
+  return { config: null, source: null };
+}
+
+/** The single home for the door-two rule: a stored management key is only
+    restored alongside a config we can prove is the site it belongs to,
+    which is the draft it was saved next to. A config that came from any
+    other hash (a shared v1. link, a management link still resolving) never
+    inherits somebody else's printed-link key. */
+export function manageKeyFor(source: ConfigSource, stored: ManageKey | null): ManageKey | null {
+  return source === 'draft' ? stored : null;
 }
 
 function Logo({ onClick }: { onClick: () => void }) {
@@ -75,7 +96,7 @@ function ListItem(props: {
   );
 }
 
-function StartScreen({ onPick }: { onPick: (cfg: SiteConfig) => void }) {
+function StartScreen({ onPick, notice }: { onPick: (cfg: SiteConfig) => void; notice?: string }) {
   const [lang, setLang] = useState<Lang>('en');
   const [importUrl, setImportUrl] = useState('');
   const [importing, setImporting] = useState(false);
@@ -105,6 +126,7 @@ function StartScreen({ onPick }: { onPick: (cfg: SiteConfig) => void }) {
   return (
     <div className="start">
       <div className="start-main">
+        {notice && <p className="imp-status imp-err">{notice}</p>}
         <p className="kick">New site · pick a starting point</p>
         <h1>Every site here starts finished.</h1>
         <p className="lede">
@@ -154,11 +176,16 @@ function StartScreen({ onPick }: { onPick: (cfg: SiteConfig) => void }) {
 }
 
 export function Editor({ nav }: { nav: (p: string) => void }) {
-  const [config, setConfig] = useState<SiteConfig | null>(initialConfig);
+  const [config, setConfig] = useState<SiteConfig | null>(() => initialConfig().config);
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [shareOpen, setShareOpen] = useState(false);
-  const [manage, setManage] = useState<ManageKey | null>(null);
+  const [manage, setManage] = useState<ManageKey | null>(() =>
+    manageKeyFor(initialConfig().source, loadManageKey()),
+  );
   const [pushing, setPushing] = useState<'' | 'busy' | 'done' | 'failed'>('');
+  /* only meaningful while config is null: are we resolving a management
+     link, or did that resolution just fail */
+  const [opening, setOpening] = useState<'' | 'loading' | 'failed'>('');
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const scrollRef = useRef(0);
   const [previewHtml, setPreviewHtml] = useState('');
@@ -167,20 +194,29 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
   const viewUrl = encoded ? `${location.origin}/s/#${encoded}` : '';
 
   /* a management link opens the live version of a printed site, not the copy
-     that link was made from — that copy would be frozen at creation time */
+     that link was made from, because that copy would be frozen at creation
+     time. manage/saveManageKey only happen after the fetch actually returns
+     a payload: never assume the hash is trustworthy before it is proven so,
+     and never leave a stale, unrelated draft on screen while we find out. */
   useEffect(() => {
     const fromHash = parseManageHash(location.hash);
-    if (fromHash) {
-      setManage(fromHash);
-      saveManageKey(fromHash);
-      readShortLink(fromHash.id).then((payload) => {
-        if (!payload) return;
+    if (!fromHash) return;
+    setConfig(null);
+    setManage(null);
+    setOpening('loading');
+    readShortLink(fromHash.id)
+      .then((payload) => {
+        if (!payload) throw new Error('no payload');
         const raw = decodeSite(payload);
-        if (raw !== null) setConfig(normalizeConfig(raw));
+        if (raw === null) throw new Error('undecodable payload');
+        setConfig(normalizeConfig(raw));
+        setManage(fromHash);
+        saveManageKey(fromHash);
+        setOpening('');
+      })
+      .catch(() => {
+        setOpening('failed');
       });
-      return;
-    }
-    setManage(loadManageKey());
   }, []);
 
   /* debounce: config -> preview + draft + editable link in the address bar */
@@ -214,11 +250,26 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
         <div className="ed-top">
           <Logo onClick={() => nav('/')} />
         </div>
-        <StartScreen
-          onPick={(cfg) => {
-            setConfig(cfg);
-          }}
-        />
+        {opening === 'loading' ? (
+          <div className="start">
+            <div className="start-main">
+              <p className="kick">Opening your printed site</p>
+              <h1>Fetching the latest version.</h1>
+            </div>
+          </div>
+        ) : (
+          <StartScreen
+            onPick={(cfg) => {
+              setOpening('');
+              setConfig(cfg);
+            }}
+            notice={
+              opening === 'failed'
+                ? 'Could not open your printed site just now. Check your connection and open the link again.'
+                : undefined
+            }
+          />
+        )}
       </div>
     );
   }
@@ -238,6 +289,7 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
     setPreviewHtml('');
     setConfig(null);
     setManage(null);
+    setOpening('');
   };
 
   const kb = (encoded.length / 1024).toFixed(1);

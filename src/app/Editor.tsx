@@ -8,7 +8,15 @@ import { buildPreset, PRESETS, type Lang } from '../site/presets';
 import { Acc, Area, IconPicker, ImageField, Text, Toggle } from './fields';
 import { importSite } from '../import/importSite';
 import { Share } from './Share';
-import { saveManageKey, type ManageKey } from './shortlink';
+import {
+  clearManageKey,
+  loadManageKey,
+  parseManageHash,
+  readShortLink,
+  saveManageKey,
+  updateShortLink,
+  type ManageKey,
+} from './shortlink';
 
 const DRAFT_KEY = 'urlite-draft';
 
@@ -150,12 +158,30 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop');
   const [shareOpen, setShareOpen] = useState(false);
   const [manage, setManage] = useState<ManageKey | null>(null);
+  const [pushing, setPushing] = useState<'' | 'busy' | 'done' | 'failed'>('');
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const scrollRef = useRef(0);
   const [previewHtml, setPreviewHtml] = useState('');
 
   const encoded = useMemo(() => (config ? encodeSite(config) : ''), [config]);
   const viewUrl = encoded ? `${location.origin}/s/#${encoded}` : '';
+
+  /* a management link opens the live version of a printed site, not the copy
+     that link was made from — that copy would be frozen at creation time */
+  useEffect(() => {
+    const fromHash = parseManageHash(location.hash);
+    if (fromHash) {
+      setManage(fromHash);
+      saveManageKey(fromHash);
+      readShortLink(fromHash.id).then((payload) => {
+        if (!payload) return;
+        const raw = decodeSite(payload);
+        if (raw !== null) setConfig(normalizeConfig(raw));
+      });
+      return;
+    }
+    setManage(loadManageKey());
+  }, []);
 
   /* debounce: config -> preview + draft + editable link in the address bar */
   useEffect(() => {
@@ -207,9 +233,11 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
   const startOver = () => {
     if (!confirm('Start a new site? Your current draft stays in this tab’s link until you leave.')) return;
     localStorage.removeItem(DRAFT_KEY);
+    clearManageKey();
     history.replaceState({}, '', '/app');
     setPreviewHtml('');
     setConfig(null);
+    setManage(null);
   };
 
   const kb = (encoded.length / 1024).toFixed(1);
@@ -239,6 +267,34 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
           Share
         </button>
       </div>
+
+      {manage && (
+        <div className="managed">
+          <span>This site has a printed link.</span>
+          <button
+            className="btn btn-k btn-sm"
+            disabled={pushing === 'busy'}
+            onClick={async () => {
+              setPushing('busy');
+              try {
+                await updateShortLink(manage, encoded);
+                setPushing('done');
+                setTimeout(() => setPushing(''), 2400);
+              } catch {
+                setPushing('failed');
+              }
+            }}
+          >
+            {pushing === 'busy'
+              ? 'Updating…'
+              : pushing === 'done'
+                ? 'Updated ✓'
+                : pushing === 'failed'
+                  ? 'Did not go through, try again'
+                  : 'Update the printed link'}
+          </button>
+        </div>
+      )}
 
       <div className="ed-body">
         <div className="panel">

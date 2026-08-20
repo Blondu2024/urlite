@@ -191,6 +191,8 @@ input, textarea, select { font: inherit; color: inherit; }
 .ed-top .logo { font-size: 1.15rem; margin-right: 4px; }
 .ed-top .logo-mark { width: 30px; height: 30px; }
 .ed-sep { width: 1px; height: 24px; background: var(--line); }
+.managed { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap;
+  padding: .5rem .9rem; font-size: .84rem; border-bottom: 1px solid var(--line); }
 .kb-badge {
   font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em; background: var(--paper-2);
   border-radius: 99px; padding: 6px 12px; font-variant-numeric: tabular-nums; white-space: nowrap;

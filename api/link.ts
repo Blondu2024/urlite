@@ -90,3 +90,77 @@ export function validPayload(v: unknown): v is string {
     return false;
   }
 }
+
+export interface Store {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+}
+
+export interface LinkRecord {
+  payload: string;
+  secretHash: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export function keyOf(id: string): string {
+  return `x:${id}`;
+}
+
+function json(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+  });
+}
+
+function isId(v: unknown): v is string {
+  return typeof v === 'string' && v.length === 10 && [...v].every((c) => ID_ALPHABET.includes(c));
+}
+
+async function read(store: Store, id: string): Promise<LinkRecord | null> {
+  const raw = await store.get(keyOf(id));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as LinkRecord;
+  } catch {
+    return null;
+  }
+}
+
+export async function handlePost(
+  body: unknown,
+  store: Store,
+  now: number = Date.now(),
+): Promise<Response> {
+  if (typeof body !== 'object' || body === null) return json(400, { ok: false, error: 'bad request' });
+  const b = body as { id?: unknown; secret?: unknown; payload?: unknown };
+
+  if (b.id === undefined && b.secret === undefined) {
+    if (b.payload === undefined) return json(400, { ok: false, error: 'bad request' });
+    if (!validPayload(b.payload)) return json(422, { ok: false, error: 'not a site' });
+    const id = newId();
+    const secret = newSecret();
+    const rec: LinkRecord = {
+      payload: b.payload,
+      secretHash: await sha256Hex(secret),
+      createdAt: now,
+      updatedAt: now,
+    };
+    await store.set(keyOf(id), JSON.stringify(rec));
+    return json(200, { ok: true, id, secret });
+  }
+
+  if (!isId(b.id) || typeof b.secret !== 'string') {
+    return json(400, { ok: false, error: 'bad request' });
+  }
+  const rec = await read(store, b.id);
+  if (!rec) return json(404, { ok: false, error: 'no such link' });
+  if (!(await sameSecret(rec.secretHash, b.secret))) {
+    return json(403, { ok: false, error: 'forbidden' });
+  }
+  if (!validPayload(b.payload)) return json(422, { ok: false, error: 'not a site' });
+  const next: LinkRecord = { ...rec, payload: b.payload, updatedAt: now };
+  await store.set(keyOf(b.id), JSON.stringify(next));
+  return json(200, { ok: true });
+}

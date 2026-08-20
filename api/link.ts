@@ -130,6 +130,17 @@ async function read(store: Store, id: string): Promise<LinkRecord | null> {
 
 declare const process: { env: Record<string, string | undefined> };
 
+/**
+ * The one place that knows which host serves short links. The client cannot
+ * read SHORT_HOST, so every response that mentions an id says the whole URL,
+ * which is what lets the share dialog show a printable link on a second
+ * visit instead of an empty box.
+ */
+export function shortUrlFor(id: string): string {
+  const host = process.env.SHORT_HOST || 'urlite-x.vercel.app';
+  return `https://${host}/x/${id}`;
+}
+
 export async function handlePost(
   body: unknown,
   store: Store,
@@ -150,8 +161,7 @@ export async function handlePost(
       updatedAt: now,
     };
     await store.set(keyOf(id), JSON.stringify(rec));
-    const host = process.env.SHORT_HOST || 'urlite-x.vercel.app';
-    return json(200, { ok: true, id, secret, url: `https://${host}/x/${id}` });
+    return json(200, { ok: true, id, secret, url: shortUrlFor(id) });
   }
 
   if (!isId(b.id) || typeof b.secret !== 'string') {
@@ -187,7 +197,9 @@ export async function handleGet(
   }
 
   if (!rec) return json(404, { ok: false, error: 'no such link' });
-  return json(200, { ok: true, payload: rec.payload });
+  /* the url travels with the payload so somebody opening a management link
+     on a fresh machine can be shown the link they printed */
+  return json(200, { ok: true, payload: rec.payload, url: shortUrlFor(params.id as string) });
 }
 
 /* kept identical to api/rewrite.ts so the two cannot drift apart */

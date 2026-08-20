@@ -123,6 +123,14 @@ describe('read', () => {
     expect(res.headers.get('cache-control')).toBe('no-store');
   });
 
+  it('names the short url too, so a management link on a fresh machine can show it', async () => {
+    const store = memoryStore();
+    const out = await body(await handlePost({ payload: payloadA }, store, 1000));
+    const read = await body(await handleGet({ id: out.id, go: false }, store));
+    expect(read.url).toBe(`https://urlite-x.vercel.app/x/${out.id}`);
+    expect(read.url).toBe(out.url);
+  });
+
   it('404s on an id nobody made', async () => {
     const store = memoryStore();
     expect((await handleGet({ id: 'zzzzzzzzzz', go: false }, store)).status).toBe(404);

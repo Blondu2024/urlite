@@ -42,6 +42,27 @@ describe('the printable link section', () => {
     expect(html).not.toContain('No server, no database, no account');
   });
 
+  it('shows a real link to print for somebody who already has a key', () => {
+    /* the box used to be filled only by the create button in this same modal
+       instance, so every returning visit showed an empty input captioned
+       "This is the link to print" */
+    const html = render({ manage: { id: 'a7fq2m9k3p', secret: 'AbCdEfGhIjKlMnOpQrStUv' } });
+    expect(html).toContain('This is the link to print');
+    expect(html).toContain('https://urlite-x.vercel.app/x/a7fq2m9k3p');
+    expect(html).not.toContain('value=""');
+  });
+
+  it('prefers the url the server named over the derived one', () => {
+    const html = render({
+      manage: {
+        id: 'a7fq2m9k3p',
+        secret: 'AbCdEfGhIjKlMnOpQrStUv',
+        url: 'https://elsewhere.example/x/a7fq2m9k3p',
+      },
+    });
+    expect(html).toContain('https://elsewhere.example/x/a7fq2m9k3p');
+  });
+
   it('shows the management link as the thing to keep', () => {
     const html = render({ manage: { id: 'a7fq2m9k3p', secret: 'AbCdEfGhIjKlMnOpQrStUv' } });
     expect(html).toContain('#m=a7fq2m9k3p.AbCdEfGhIjKlMnOpQrStUv');

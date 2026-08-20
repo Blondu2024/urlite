@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import type { SiteConfig } from '../site/types';
 import { renderSiteHTML } from '../site/render';
 import { collectImageUrls, embedImages } from '../site/embed';
-import { createShortLink, manageUrl, type ManageKey } from './shortlink';
+import { createShortLink, manageUrl, shortLinkUrl, type ManageKey } from './shortlink';
 
 const AVERAGE_PAGE_BYTES = 2.4 * 1024 * 1024; // httparchive median-ish, for the punchline
 
@@ -24,17 +24,24 @@ export function Share(props: {
   const [shortErr, setShortErr] = useState('');
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  /* The link to print, derived rather than remembered from this one modal
+     instance. shortUrl is only ever set by the button below, so on a second
+     visit (key restored from storage, or arrived on a management link) that
+     is null and the printable box would be empty and the QR would fall back
+     to the long link, which for app and shop is too big to encode at all. */
+  const printUrl = shortUrl ?? (props.manage ? shortLinkUrl(props.manage) : null);
+
   useEffect(() => {
     setQrOk(true);
     const canvas = canvasRef.current;
     if (!canvas) return;
-    QRCode.toCanvas(canvas, shortUrl ?? props.link, {
+    QRCode.toCanvas(canvas, printUrl ?? props.link, {
       width: 164,
       margin: 1,
       errorCorrectionLevel: 'L',
       color: { dark: '#141414', light: '#ffffff' },
     }).catch(() => setQrOk(false));
-  }, [props.link, shortUrl]);
+  }, [props.link, printUrl]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && props.onClose();
@@ -105,17 +112,24 @@ export function Share(props: {
             Your entire website weighs <b>{kb} KB</b>, about <b>{ratio.toLocaleString()}×</b>{' '}
             lighter than the average web page. Anyone who opens the link gets the full site;
             anyone who opens it in the editor can keep working on it.
-            {qrOk && <> The QR code on the left contains the whole website too.</>}
+            {qrOk && (
+              <>
+                {' '}
+                {printUrl
+                  ? 'The QR code on the left holds the short link below, so it keeps working after you edit the site.'
+                  : 'The QR code on the left contains the whole website too.'}
+              </>
+            )}
             {' '}The downloaded HTML file goes one step further: it packs the photos
             themselves inside, so it works even offline.
           </div>
         </div>
 
         <div className="share-print">
-          {shortUrl || props.manage ? (
+          {printUrl ? (
             <>
               <div className="share-link">
-                <input readOnly value={shortUrl ?? ''} onFocus={(e) => e.target.select()} />
+                <input readOnly value={printUrl} onFocus={(e) => e.target.select()} />
               </div>
               <p className="note">
                 This is the link to print. Edit the site later and press

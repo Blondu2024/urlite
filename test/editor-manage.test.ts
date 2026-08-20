@@ -27,6 +27,23 @@ describe('the management key in storage', () => {
     expect(loadManageKey()).toEqual({ id: 'a7fq2m9k3p', secret: 'AbCdEfGhIjKlMnOpQrStUv' });
   });
 
+  it('keeps the printable url alongside the key', () => {
+    saveManageKey({
+      id: 'a7fq2m9k3p',
+      secret: 'AbCdEfGhIjKlMnOpQrStUv',
+      url: 'https://urlite-x.vercel.app/x/a7fq2m9k3p',
+    });
+    expect(loadManageKey()?.url).toBe('https://urlite-x.vercel.app/x/a7fq2m9k3p');
+  });
+
+  it('drops a url that is not a string rather than trusting it', () => {
+    localStorage.setItem(
+      MANAGE_KEY,
+      JSON.stringify({ id: 'a7fq2m9k3p', secret: 'AbCdEfGhIjKlMnOpQrStUv', url: 7 }),
+    );
+    expect(loadManageKey()).toEqual({ id: 'a7fq2m9k3p', secret: 'AbCdEfGhIjKlMnOpQrStUv' });
+  });
+
   it('is nothing when nothing was saved', () => {
     expect(loadManageKey()).toBeNull();
   });

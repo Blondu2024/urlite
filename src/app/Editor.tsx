@@ -241,13 +241,16 @@ export function Editor({ nav }: { nav: (p: string) => void }) {
     setManage(null);
     setOpening('loading');
     readShortLink(fromHash.id)
-      .then((payload) => {
-        if (!payload) throw new Error('no payload');
-        const raw = decodeSite(payload);
+      .then((found) => {
+        if (!found) throw new Error('no payload');
+        const raw = decodeSite(found.payload);
         if (raw === null) throw new Error('undecodable payload');
+        /* the server names the host, so the key we keep from here on can
+           show the printed link even on a machine that never made it */
+        const key: ManageKey = found.url ? { ...fromHash, url: found.url } : fromHash;
         setConfig(normalizeConfig(raw));
-        setManage(fromHash);
-        saveManageKey(fromHash);
+        setManage(key);
+        saveManageKey(key);
         setOpening('');
       })
       .catch(() => {

@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { JSDOM } from 'jsdom';
 
 /**
- * Regression tests for two panel-layout bugs reported 15 Aug 2026 (Anthony
+ * Regression tests for two panel-layout bugs reported 15 Aug 2026 (Damien
  * Lavizzo, desktop Chrome):
  *
  * 1. Theme swatches were not uniform — "Midnight & Coral" and "Forest & Honey"

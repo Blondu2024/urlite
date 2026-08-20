@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 /**
- * Regression test for bug #5 reported 16 Aug 2026 (Anthony Lavizzo, mobile,
+ * Regression test for bug #5 reported 16 Aug 2026 (Damien Lavizzo, mobile,
  * with screenshot): the editor's top bar did not wrap on narrow screens.
  *
  * Root cause: `.ed-top` is a fixed-height (60px) flex row with no `flex-wrap`,

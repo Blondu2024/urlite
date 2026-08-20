@@ -4,7 +4,7 @@ import { buildPreset } from '../src/site/presets';
 
 /**
  * Regression tests for the editor preview "strobing" reported 15 Aug 2026
- * (Anthony Lavizzo — a distraction and a possible epilepsy trigger).
+ * (Damien Lavizzo — a distraction and a possible epilepsy trigger).
  *
  * The preview iframe already debounced updates (250 ms), but every refresh
  * swapped srcdoc → a full reload that replayed the ENTIRE first-visit

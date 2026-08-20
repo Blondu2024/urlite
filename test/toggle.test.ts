@@ -6,7 +6,7 @@ import { JSDOM } from 'jsdom';
 /**
  * Regression test for the toggle switches in the editor panel.
  *
- * Reported 15 Aug 2026 (Anthony Lavizzo, Chrome/Windows): none of the on/off
+ * Reported 15 Aug 2026 (Damien Lavizzo, Chrome/Windows): none of the on/off
  * switches could be operated — all that showed was a white dot sitting on top
  * of the label text. Root cause: `.f label { display: block }` (0,1,1) beat
  * `.toggle { display: flex }` (0,1,0), so the switch track `.tk` became an

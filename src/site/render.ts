@@ -21,7 +21,7 @@ export interface RenderOptions {
   /**
    * Render the page already settled: no entrance animations, no GSAP.
    * Used by the editor preview so a keystroke never replays the first-visit
-   * choreography (the "strobing" Anthony reported, 15 Aug 2026). The viewer,
+   * choreography (the "strobing" Damien reported, 15 Aug 2026). The viewer,
    * the shared link and the HTML export never set this.
    */
   still?: boolean;

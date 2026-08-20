@@ -5,7 +5,7 @@ import { encodeSite, decodeSite } from '../src/site/codec';
 import { buildPreset, PRESETS } from '../src/site/presets';
 
 /**
- * The "app page" template promised publicly to Anthony Lavizzo (16 Aug 2026):
+ * The "app page" template promised publicly to Damien Lavizzo (16 Aug 2026):
  * the one-pager Apple/Google require for a store listing — what the app does,
  * plus the privacy policy and terms, on a single page.
  *

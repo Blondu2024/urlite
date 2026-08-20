@@ -1,7 +1,28 @@
 {
   "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/x/:id",
+      "has": [{ "type": "host", "value": "urlite.app" }],
+      "destination": "https://urlite-x.vercel.app/x/:id",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "urlite-x.vercel.app" }],
+      "destination": "https://urlite.app/",
+      "permanent": false
+    },
+    {
+      "source": "/app",
+      "has": [{ "type": "host", "value": "urlite-x.vercel.app" }],
+      "destination": "https://urlite.app/app",
+      "permanent": false
+    }
+  ],
   "rewrites": [
-    { "source": "/app", "destination": "/" }
+    { "source": "/app", "destination": "/" },
+    { "source": "/x/:id", "destination": "/api/link?id=:id&go=1" }
   ],
   "headers": [
     {
@@ -10,6 +31,10 @@
     },
     {
       "source": "/s",
+      "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
+    },
+    {
+      "source": "/x/(.*)",
       "headers": [{ "key": "X-Robots-Tag", "value": "noindex" }]
     }
   ]
